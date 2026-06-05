@@ -1,7 +1,7 @@
 const ADMIN_CODE="MHI-ADMIN-FRIDAY-2026";
 const OWNER_CODE="MHI-OWNER-MARIO-TV-2026";
 const TEMP_ADMIN_MINUTES=60;
-const SHEETS={SETTINGS:"Settings",PLAYERS:"Players",PLAYS:"Plays",ADJUSTMENTS:"Adjustments",ACTION_LOGS:"Action Logs",TEMP_CODES:"Temporary Admin Codes",SUSPICIOUS:"Suspicious Activity",FUN_SCORES:"Fun Scores"};
+const SHEETS={SETTINGS:"Settings",PLAYERS:"Players",PLAYS:"Plays",ADJUSTMENTS:"Adjustments",ACTION_LOGS:"Action Logs",TEMP_CODES:"Temporary Admin Codes",SUSPICIOUS:"Suspicious Activity",FUN_SCORES:"Fun Scores",CORRECTIONS:"Name Corrections"};
 function doPost(e){try{const data=JSON.parse(e.postData.contents||"{}");const a=data.action;
 if(a==="joinGame")return json(joinGame(data,e));if(a==="saveProgress")return json(saveProgress(data,e));if(a==="submitScore")return json(submitScore(data,e));if(a==="leaderboard")return json(getLeaderboard());if(a==="exportLeaderboard")return json(exportLeaderboard(data,e));if(a==="adminVerify")return json({ok:isAdmin(data.code)});if(a==="ownerVerify")return json({ok:isOwner(data.code)});if(a==="setReleaseStatus")return json(setReleaseStatus(data,e));if(a==="setWeekGame")return json(setWeekGame(data,e));if(a==="renamePlayerTypo")return json(renamePlayerTypo(data,e));if(a==="fairPlayAudit")return json(fairPlayAudit(data));if(a==="ownerAdjust")return json(ownerAdjust(data,e));if(a==="ownerResetPlayerRound")return json(ownerResetPlayerRound(data,e));if(a==="ownerArchiveResetLeaderboard")return json(ownerArchiveResetLeaderboard(data,e));if(a==="ownerDeletePlayer")return json(ownerDeletePlayer(data,e));if(a==="ownerDeletePlayerCompletely")return json(ownerDeletePlayer(data,e));if(a==="generateTempAdminCode")return json(generateTempAdminCode(data,e));if(a==="getActionLogs")return json(getActionLogs(data));if(a==="getSuspiciousActivity")return json(getSuspiciousActivity(data));if(a==="internalSummaryReport")return json(internalSummaryReport(data));if(a==="participationReport")return json(participationReport(data));if(a==="redemptionReport")return json(redemptionReport(data));if(a==="prizePointsReport")return json(prizePointsReport(data));if(a==="getActiveProviderRound")return json(getActiveProviderRound(data));if(a==="submitFunScore")return json(submitFunScore(data,e));if(a==="funLeaderboard")return json(funLeaderboard(data));if(a==="deleteFunUser")return json(deleteFunUser(data,e));if(a==="deepAuditReport")return json(deepAuditReport(data));return json({ok:false,message:"Unknown action."});}catch(err){return json({ok:false,message:String(err)});}}
 function json(o){return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);}
@@ -61,6 +61,33 @@ function setReleaseStatus(d,e){
 }
 function ensurePlayer(name){const sh=sheet(SHEETS.PLAYERS);const nn=norm(name), niceName=nice(name);const v=sh.getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][1]===nn)return{nameNice:v[i][0],nameNorm:nn};}sh.appendRow([niceName,nn,now(),"","Active"]);return{nameNice:niceName,nameNorm:nn};}
 function updateNameInSheet(sheetName, normCol, displayCol, oldNorm, newNorm, newNice){const sh=sheet(sheetName);const v=sh.getDataRange().getValues();let changed=0;for(let i=1;i<v.length;i++){if(v[i][normCol]===oldNorm){sh.getRange(i+1,normCol+1).setValue(newNorm);if(displayCol!==null)sh.getRange(i+1,displayCol+1).setValue(newNice);changed++;}}return changed;}
+
+function ensureNameCorrectionsSheet(){
+  let sh=ss().getSheetByName(SHEETS.CORRECTIONS);
+  if(!sh){
+    sh=ss().insertSheet(SHEETS.CORRECTIONS);
+    sh.appendRow(["Timestamp","Old Name","Old Normalized Name","Corrected Name","Corrected Normalized Name","Changed By","Status"]);
+  }
+  if(sh.getLastRow()===0){
+    sh.appendRow(["Timestamp","Old Name","Old Normalized Name","Corrected Name","Corrected Normalized Name","Changed By","Status"]);
+  }
+  return sh;
+}
+function addNameCorrection(oldName,newName,role){
+  const sh=ensureNameCorrectionsSheet();
+  sh.appendRow([now(),nice(oldName),norm(oldName),nice(newName),norm(newName),role,"Active"]);
+}
+function findNameCorrection(oldNorm){
+  const sh=ensureNameCorrectionsSheet();
+  const v=sh.getDataRange().getValues();
+  for(let i=v.length-1;i>=1;i--){
+    if(v[i][2]===oldNorm && String(v[i][6]||"Active")==="Active"){
+      return{oldName:v[i][1],oldNorm:v[i][2],newName:v[i][3],newNorm:v[i][4],changedBy:v[i][5],timestamp:v[i][0]};
+    }
+  }
+  return null;
+}
+
 function renamePlayerTypo(d,e){
   const ok=(d.role==="owner"&&isOwner(d.code))||(d.role==="admin"&&isAdmin(d.code));
   if(!ok)return{ok:false,message:"Invalid code."};
@@ -86,7 +113,7 @@ function renamePlayerTypo(d,e){
     ensurePlayer(newNice);
   }
 
-  logAction(d.role,"Fix Typo / Rename Player Preserve Rejoin",{oldName:d.oldName,newName:d.newName,oldNorm,newNorm,changed},e);
+  addNameCorrection(d.oldName,d.newName,d.role);logAction(d.role,"Fix Typo / Rename Player Preserve Rejoin",{oldName:d.oldName,newName:d.newName,oldNorm,newNorm,changed},e);
 
   return{
     ok:true,
@@ -115,6 +142,19 @@ function findStartedAny(nm,week,type){const v=sheet(SHEETS.PLAYS).getDataRange()
 function completedExact(nm,week,game,type){const v=sheet(SHEETS.PLAYS).getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][2]===nm&&v[i][3]===week&&v[i][4]===game&&v[i][13]===type&&v[i][11]==="Completed")return true;}return false;}
 function completedMainAny(nm,week){const v=sheet(SHEETS.PLAYS).getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][2]===nm&&v[i][3]===week&&v[i][13]==="main"&&v[i][11]==="Completed")return true;}return false;}
 function joinGame(d,e){
+  const enteredNorm=norm(d.name);
+  const correction=findNameCorrection(enteredNorm);
+  if(correction && !d.confirmOldTypo){
+    logSuspicious(d.name,"Corrected typo re-entered - confirmation required",{enteredName:d.name,correctedName:correction.newName,changedBy:correction.changedBy,correctionTimestamp:String(correction.timestamp)});
+    return{
+      ok:false,
+      requiresConfirmation:true,
+      message:"This name was recently corrected to '"+correction.newName+"'. If you continue with '"+nice(d.name)+"', it will start as a new player and admin/owner will be able to review it. Continue?"
+    };
+  }
+  if(correction && d.confirmOldTypo){
+    logSuspicious(d.name,"Corrected typo re-entered - player confirmed new entry",{enteredName:d.name,correctedName:correction.newName,changedBy:correction.changedBy,correctionTimestamp:String(correction.timestamp)});
+  }
   const p=ensurePlayer(d.name);
   const active=getActiveProviderRound({}).active;
 
@@ -161,9 +201,9 @@ function joinGame(d,e){
     return{ok:false,message:"Sorry, this name has already completed this active round."};
   }
 
-  if(type==="redemption"&&completedMainAny(p.nameNorm,week)){
-    return{ok:false,message:"Not eligible for redemption because the main weekly game was already completed."};
-  }
+  // Redemption eligibility is controlled by Admin/Owner opening the redemption round.
+  // If a week/round was reset by owner, the player can rejoin whichever round is currently open.
+  
 
   const playId=uuid();
   sheet(SHEETS.PLAYS).appendRow([playId,p.nameNice,p.nameNorm,week,activeGame,now(),"",0,0,0,"","Started","",type,false,false,0,0,0]);
@@ -174,7 +214,51 @@ function joinGame(d,e){
 function saveProgress(d,e){const sh=sheet(SHEETS.PLAYS);const v=sh.getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][0]===d.playId&&v[i][11]==="Started"){sh.getRange(i+1,17,1,3).setValues([[Number(d.qIndex||0),Number(d.score||0),Number(d.correct||0)]]);return{ok:true};}}return{ok:false,message:"Session not found"};}
 function submitScore(d,e){const sh=sheet(SHEETS.PLAYS);const v=sh.getDataRange().getValues();let row=null;for(let i=1;i<v.length;i++)if(v[i][0]===d.playId)row=i+1;if(!row)return{ok:false,message:"Play session not found."};const start=sh.getRange(row,6).getValue();const elapsed=start?Math.round((now()-new Date(start))/60000):"";const score=Number(d.score||0);let fair=score>105||elapsed<1?"Review":"OK";sh.getRange(row,7,1,12).setValues([[now(),score,Number(d.correct||0),Number(d.answered||0),elapsed,"Completed",fair,d.releaseType,Boolean(d.prizeEligible),Number(d.answered||0),score,Number(d.correct||0)]]);if(fair==="Review")logSuspicious(d.name,"Score flagged",{score,elapsed});logAction("player","Submit Score",{name:d.name,week:d.week,game:d.game,score,fair,badge:d.badge||"",difficulty:d.difficulty||""},e);return{ok:true,message:"Game complete. Final score: "+score,fairFlag:fair};}
 function ownerAdjust(d,e){if(!isOwner(d.code))return{ok:false,message:"Invalid owner code."};const p=ensurePlayer(d.name);sheet(SHEETS.ADJUSTMENTS).appendRow([now(),p.nameNice,p.nameNorm,Number(d.points||0),d.reason,"Owner"]);logAction("owner","Score Adjustment",{name:p.nameNice,points:d.points,reason:d.reason},e);return{ok:true,message:"Adjustment recorded."};}
-function ownerResetPlayerRound(d,e){if(!isOwner(d.code))return{ok:false,message:"Invalid owner code."};const target=norm(d.name),week=d.week,type=d.releaseType;if(!target||!week||!type)return{ok:false,message:"Name, week, and round are required."};const sh=sheet(SHEETS.PLAYS);const v=sh.getDataRange().getValues();let changed=0;for(let i=1;i<v.length;i++){if(v[i][2]===target&&v[i][3]===week&&v[i][13]===type&&(v[i][11]==="Completed"||v[i][11]==="Started")){sh.getRange(i+1,12).setValue("Owner Reset - Archived");sh.getRange(i+1,13).setValue("Archived");changed++;}}logAction("owner","Reset Player Round",{name:d.name,week,releaseType:type,recordsArchived:changed},e);return{ok:true,message:"Player round reset. Existing record kept as Owner Reset - Archived.",recordsArchived:changed};}
+function ownerResetPlayerRound(d,e){
+  if(!isOwner(d.code))return{ok:false,message:"Invalid owner code."};
+
+  const target=norm(d.name);
+  const week=d.week;
+  const type=d.releaseType;
+
+  if(!target||!week||!type)return{ok:false,message:"Name, week, and round are required."};
+
+  const sh=sheet(SHEETS.PLAYS);
+  const v=sh.getDataRange().getValues();
+  let changed=0;
+  let pointsRemoved=0;
+  const gamesReset={};
+
+  // Scope is intentionally narrow:
+  // only this player + this week + this selected round type.
+  // Other weeks stay untouched.
+  for(let i=1;i<v.length;i++){
+    if(v[i][2]===target && v[i][3]===week && v[i][13]===type && (v[i][11]==="Completed"||v[i][11]==="Started")){
+      pointsRemoved+=Number(v[i][7]||0);
+      gamesReset[v[i][4]]=true;
+      sh.getRange(i+1,12).setValue("Owner Reset - Archived");
+      sh.getRange(i+1,13).setValue("Archived");
+      changed++;
+    }
+  }
+
+  logAction("owner","Reset Player Week/Round",{
+    name:d.name,
+    week:week,
+    releaseType:type,
+    recordsArchived:changed,
+    pointsRemoved:pointsRemoved,
+    gamesReset:Object.keys(gamesReset)
+  },e);
+
+  return{
+    ok:true,
+    message:"Player reset completed for "+week+" "+(type==="redemption"?"redemption":"main")+" only. Points from that selected week/round were removed from the active leaderboard. If that week/round is open, the player can rejoin it. Other weeks were not affected.",
+    recordsArchived:changed,
+    pointsRemoved:pointsRemoved,
+    gamesReset:Object.keys(gamesReset)
+  };
+}
 function ownerArchiveResetLeaderboard(d,e){if(!isOwner(d.code))return{ok:false,message:"Invalid owner code."};const sh=sheet(SHEETS.PLAYS);const v=sh.getDataRange().getValues();let changed=0;for(let i=1;i<v.length;i++){if(v[i][11]==="Completed"){sh.getRange(i+1,12).setValue("Leaderboard Reset - Archived");sh.getRange(i+1,13).setValue("Archived");changed++;}}logAction("owner","Archive Reset Leaderboard",{recordsArchived:changed},e);return{ok:true,message:"Leaderboard reset. Completed records archived and kept for history.",recordsArchived:changed};}
 function deleteRowsByName(sheetName,nameNorm,colIndex){const sh=sheet(sheetName);const v=sh.getDataRange().getValues();let deleted=0;for(let i=v.length-1;i>=1;i--){if(v[i][colIndex]===nameNorm){sh.deleteRow(i+1);deleted++;}}return deleted;}
 function ownerDeletePlayer(d,e){
@@ -194,7 +278,13 @@ function ownerDeletePlayer(d,e){
 }
 function getLeaderboard(){const totals={};const plays=sheet(SHEETS.PLAYS).getDataRange().getValues();for(let i=1;i<plays.length;i++){if(plays[i][11]!=="Completed")continue;const key=plays[i][2],name=plays[i][1],score=Number(plays[i][7]||0),prize=boolValue(plays[i][14]);if(!totals[key])totals[key]={name,totalPoints:0,prizePoints:0,gamesPlayed:0,badges:{}};totals[key].totalPoints+=score;totals[key].gamesPlayed++;if(prize)totals[key].prizePoints+=score;totals[key].badges[plays[i][4]]=true;}const adj=sheet(SHEETS.ADJUSTMENTS).getDataRange().getValues();for(let i=1;i<adj.length;i++){const key=adj[i][2],name=adj[i][1],pts=Number(adj[i][3]||0);if(!totals[key])totals[key]={name,totalPoints:0,prizePoints:0,gamesPlayed:0};totals[key].totalPoints+=pts;}const badgeNames={"Movie Trivia":"Movie Buff","Guess the Quote":"Quote Master","Emoji Movie Guess":"Emoji Expert","Word Scramble":"Word Wizard","Select All":"Sharp Selector","Matching":"Match Maker","Kahoot Practice":"Kahoot Champion"};const list=Object.values(totals).map(r=>{r.badges=Object.keys(r.badges||{}).map(g=>badgeNames[g]||g).join(", ");return r;});return{ok:true,leaderboard:list.sort((a,b)=>b.totalPoints-a.totalPoints).slice(0,40)};}
 function exportLeaderboard(d,e){if(!canExport(d.code))return{ok:false,message:"Export denied."};const lb=getLeaderboard().leaderboard;const rows=[["Rank","Name","Total Points","Prize Points","Games Played"]];lb.forEach((r,i)=>rows.push([i+1,r.name,r.totalPoints,r.prizePoints,r.gamesPlayed]));return{ok:true,rows};}
-function fairPlayAudit(d){if(!isAdmin(d.code)&&!isOwner(d.code))return{ok:false,message:"Invalid code."};const v=sheet(SHEETS.PLAYS).getDataRange().getValues();const seen={},issues=[];for(let i=1;i<v.length;i++){if(v[i][11]!=="Completed")continue;const key=v[i][2]+"|"+v[i][3]+"|"+v[i][4]+"|"+v[i][13];seen[key]=(seen[key]||0)+1;if(seen[key]>1)issues.push({row:i+1,issue:"Duplicate completion",name:v[i][1]});if(v[i][12]==="Review")issues.push({row:i+1,issue:"Marked for review",name:v[i][1],game:v[i][4]});}return{ok:true,checkedRows:v.length-1,issues};}
+function fairPlayAudit(d){if(!isAdmin(d.code)&&!isOwner(d.code))return{ok:false,message:"Invalid code."};const v=sheet(SHEETS.PLAYS).getDataRange().getValues();const seen={},issues=[];for(let i=1;i<v.length;i++){if(v[i][11]!=="Completed")continue;const key=v[i][2]+"|"+v[i][3]+"|"+v[i][4]+"|"+v[i][13];seen[key]=(seen[key]||0)+1;if(seen[key]>1)issues.push({row:i+1,issue:"Duplicate completion",name:v[i][1]});if(v[i][12]==="Review")issues.push({row:i+1,issue:"Marked for review",name:v[i][1],game:v[i][4]});}const suspicious=sheet(SHEETS.SUSPICIOUS).getDataRange().getValues();
+  for(let j=1;j<suspicious.length;j++){
+    if(String(suspicious[j][3]||"").indexOf("Corrected typo re-entered")>=0){
+      issues.push({row:j+1,issue:suspicious[j][3],name:suspicious[j][1],details:suspicious[j][4]});
+    }
+  }
+  return{ok:true,checkedRows:v.length-1,issues};}
 function generateTempAdminCode(d,e){if(!isOwner(d.code))return{ok:false,message:"Invalid owner code."};const temp="TEMP-ADMIN-"+Math.floor(100000+Math.random()*900000);const created=now();const expires=new Date(created.getTime()+TEMP_ADMIN_MINUTES*60000);sheet(SHEETS.TEMP_CODES).appendRow([temp,created,expires,"Active"]);return{ok:true,tempAdminCode:temp,expires:String(expires)};}
 function getActionLogs(d){if(!isOwner(d.code))return{ok:false,message:"Invalid owner code."};const v=sheet(SHEETS.ACTION_LOGS).getDataRange().getValues();return{ok:true,logs:v.slice(Math.max(1,v.length-50))};}
 function getSuspiciousActivity(d){if(!isOwner(d.code))return{ok:false,message:"Invalid owner code."};const v=sheet(SHEETS.SUSPICIOUS).getDataRange().getValues();return{ok:true,suspicious:v.slice(Math.max(1,v.length-50))};}
