@@ -4,7 +4,7 @@ function shuffleArray(items){return [...items].sort(()=>Math.random()-0.5);}
 function shuffledChoices(question){return question.a.map((text,index)=>({text,index})).sort(()=>Math.random()-0.5);}
 
 async function api(action,payload={}){if(!API_URL||API_URL.includes("PASTE_"))throw new Error("API_URL is not set in config.js.");const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action,...payload})});return await res.json();}
-async function joinGame(){const name=$("playerName").value.trim().replace(/\s+/g," ");const week=$("weekSelect").value;const round=$("roundSelect").value;if(!name)return alert("Enter your name first.");try{const result=await api("joinGame",{name,week,releaseType:round});if(!result.ok){alert(result.message||"You cannot join this round.");return;}const gameName=result.game;session={name,week,game:gameName,releaseType:round,redemption:round==="redemption",playId:result.playId};activeGameDef=GAME_BANK[gameName];activeQuestions=filterQuestionsForWeek(activeGameDef, week, session.redemption);if(!activeQuestions||activeQuestions.length===0){alert("This game has no questions for this round.");return;}if(result.resume){qIndex=Math.min(result.progress.qIndex||0,activeQuestions.length-1);score=result.progress.score||0;correct=result.progress.correct||0;}else{qIndex=0;score=0;correct=0;}$("entryPanel").classList.add("hidden");$("activeGamePanel").classList.remove("hidden");$("gameStatus").textContent=(result.statusText||"Open")+": "+gameName;$("winnerRule").textContent=activeGameDef.prizeEligible&&!session.redemption?"Top player + prize points":"Top player tracked, no prize points";renderQuestion();await refreshLeaderboard();}catch(e){alert(e.message);}}
+async function joinGame(){const name=$("playerName").value.trim().replace(/\s+/g," ");const week=$("weekSelect").value;const round=$("roundSelect").value;if(!name)return alert("Enter your name first.");try{const result=await api("joinGame",{name,week,releaseType:round});if(!result.ok){alert(result.message||"You cannot join this round.");return;}const gameName=result.game;const activeWeek=result.week||week;const activeRound=result.releaseType||round;session={name,week:activeWeek,game:gameName,releaseType:activeRound,redemption:activeRound==="redemption",playId:result.playId};$("weekSelect").value=activeWeek;$("roundSelect").value=activeRound;activeGameDef=GAME_BANK[gameName];activeQuestions=filterQuestionsForWeek(activeGameDef, week, session.redemption);if(!activeQuestions||activeQuestions.length===0){alert("This game has no questions for this round.");return;}if(result.resume){qIndex=Math.min(result.progress.qIndex||0,activeQuestions.length-1);score=result.progress.score||0;correct=result.progress.correct||0;}else{qIndex=0;score=0;correct=0;}$("entryPanel").classList.add("hidden");$("activeGamePanel").classList.remove("hidden");$("gameStatus").textContent=(result.statusText||"Open")+": "+gameName;$("winnerRule").textContent=activeGameDef.prizeEligible&&!session.redemption?"Top player + prize points":"Top player tracked, no prize points";renderQuestion();await refreshLeaderboard();}catch(e){alert(e.message);}}
 function renderQuestion(){answerLocked=false;const q=activeQuestions[qIndex];$("questionText").textContent=q.q;$("answers").innerHTML="";$("matchingBox").innerHTML="";$("typedAnswerBox").classList.add("hidden");$("matchingBox").classList.add("hidden");$("nextBtn").disabled=true;selectedChecks=new Set();$("feedback").textContent="Current score: "+score;if(activeGameDef.type==="choice"){shuffledChoices(q).forEach((choice)=>{const btn=document.createElement("button");btn.type="button";btn.className="answer-btn";btn.textContent=choice.text;btn.addEventListener("click",()=>answerQuestion(choice.index===q.c,btn));$("answers").appendChild(btn);});}if(activeGameDef.type==="typed")$("typedAnswerBox").classList.remove("hidden");if(activeGameDef.type==="selectAll"){shuffledChoices(q).forEach((choice)=>{const btn=document.createElement("button");btn.type="button";btn.className="answer-btn";btn.textContent=choice.text;btn.addEventListener("click",()=>{if(selectedChecks.has(choice.index)){selectedChecks.delete(choice.index);btn.classList.remove("correct");}else{selectedChecks.add(choice.index);btn.classList.add("correct");}});$("answers").appendChild(btn);});const submit=document.createElement("button");submit.type="button";submit.textContent="Submit Selected Answers";submit.addEventListener("click",submitSelectAll);$("answers").appendChild(submit);}if(activeGameDef.type==="matching"){$("matchingBox").classList.remove("hidden");const right=q.pairs.map(p=>p[1]).sort(()=>Math.random()-.5);q.pairs.forEach(pair=>{const row=document.createElement("div");row.className="match-row";const left=document.createElement("strong");left.textContent=pair[0];const sel=document.createElement("select");sel.dataset.correct=pair[1];sel.innerHTML='<option value="">Choose match</option>'+right.map(r=>'<option value="'+r+'">'+r+'</option>').join("");row.appendChild(left);row.appendChild(sel);$("matchingBox").appendChild(row);});const submit=document.createElement("button");submit.type="button";submit.textContent="Submit Matching";submit.addEventListener("click",submitMatching);$("matchingBox").appendChild(submit);}}
 function submitTyped(){const q=activeQuestions[qIndex];const guess=$("typedAnswer").value.trim().toLowerCase();if(!guess)return alert("Type an answer first.");answerQuestion(guess===q.answer.toLowerCase());$("typedAnswer").value="";}
 function submitSelectAll(){const q=activeQuestions[qIndex];answerQuestion([...selectedChecks].sort().join(",")===[...q.c].sort().join(","));}
@@ -40,6 +40,13 @@ async function ownerResetPlayerRound(){const result=await api("ownerResetPlayerR
 async function ownerArchiveResetLeaderboard(){if(!confirm("Archive current completed plays and reset the visible leaderboard? This keeps history but clears current leaderboard scoring."))return;const result=await api("ownerArchiveResetLeaderboard",{code:$("ownerCode").value});$("ownerOutput").textContent=JSON.stringify(result,null,2);await refreshLeaderboard();}
 async function ownerDeletePlayer(){const name=$("ownerDeletePlayerName").value;if(!name)return alert("Enter a player name to delete.");if(!confirm("Completely delete all records for "+name+"? This cannot be undone."))return;const result=await api("ownerDeletePlayer",{code:$("ownerCode").value,name});$("ownerOutput").textContent=JSON.stringify(result,null,2);await refreshLeaderboard();}
 
+
+function applyActiveRoundLock(active){
+  const hasActive=active && active.week;
+  $("weekSelect").disabled=!!hasActive;
+  $("roundSelect").disabled=!!hasActive;
+}
+
 async function loadActiveDefault(){
   try{
     const result=await api("getActiveProviderRound",{});
@@ -47,15 +54,16 @@ async function loadActiveDefault(){
     if(result.ok && result.active && result.active.week){
       $("weekSelect").value=result.active.week;
       $("roundSelect").value=result.active.releaseType || "main";
+      applyActiveRoundLock(result.active);
       if(notice){
-        notice.textContent="Active open game: "+result.active.week+" • "+(result.active.game||"Selected game")+" • "+(result.active.releaseType==="redemption"?"Redemption":"Main Weekly Game");
+        notice.textContent="Active open game: "+result.active.week+" • "+(result.active.game||"Selected game")+" • "+(result.active.releaseType==="redemption"?"Redemption":"Main Weekly Game")+". Players can only play this active round.";
       }
-    }else if(notice){
+    }else if(notice){applyActiveRoundLock(null);
       notice.textContent="No round is open yet. Admin/Owner must open a game before players can start.";
     }
   }catch(e){
     const notice=$("activeDefaultNotice");
-    if(notice)notice.textContent="Unable to check active open game yet.";
+    if(notice)notice.textContent="Unable to check active open game yet.";applyActiveRoundLock(null);
   }
 }
 

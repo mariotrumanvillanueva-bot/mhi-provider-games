@@ -9,7 +9,7 @@ function ss(){return SpreadsheetApp.getActiveSpreadsheet();}function sheet(n){re
 function isOwner(c){return String(c||"")===OWNER_CODE;}function isAdmin(c){return String(c||"")===ADMIN_CODE||isTempAdmin(c);}function canExport(c){return isAdmin(c)||isOwner(c);}function boolValue(v){return v===true||v==="TRUE"||v==="true";}
 function isTempAdmin(c){const sh=sheet(SHEETS.TEMP_CODES);const values=sh.getDataRange().getValues();const current=now();for(let i=1;i<values.length;i++){if(values[i][0]===String(c||"")&&values[i][3]==="Active"&&new Date(values[i][2])>=current)return true;}return false;}
 function logAction(role,action,details,e){sheet(SHEETS.ACTION_LOGS).appendRow([now(),role,action,JSON.stringify(details||{}),""]);}function logSuspicious(name,issue,details){sheet(SHEETS.SUSPICIOUS).appendRow([now(),nice(name),norm(name),issue,JSON.stringify(details||{})]);}
-function settingKey(week,type){return week+" "+(type==="redemption"?"Redemption":"Main")+" Status";}function gameKey(week){return week+" Game";}
+function settingKey(week,type){return week+" "+(type==="redemption"?"Redemption":"Main")+" Status";}function gameKey(week){return week+" Game";}function activeGameKey(week,type){return week+" "+type+" Active Game";}
 function getSettingsMap(){const v=sheet(SHEETS.SETTINGS).getDataRange().getValues();const m={};for(let i=1;i<v.length;i++)m[v[i][0]]=v[i][1];return m;}
 function setSetting(key,val){const sh=sheet(SHEETS.SETTINGS);const v=sh.getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][0]===key){sh.getRange(i+1,2).setValue(val);return;}}sh.appendRow([key,val,""]);}
 function getWeekGame(week){const m=getSettingsMap();return m[gameKey(week)]||"Movie Trivia";}function isReleased(week,type){return getSettingsMap()[settingKey(week,type)]==="Open";}
@@ -20,8 +20,9 @@ function setWeekGame(d,e){
   setSetting(gameKey(d.week),d.game);
 
   const m=getSettingsMap();
-  if(m["Active Provider Week"]===d.week){
+  if(m["Active Provider Week"]===d.week && m["Active Provider Release Type"]){
     setSetting("Active Provider Game",d.game);
+    setSetting(activeGameKey(d.week,m["Active Provider Release Type"]),d.game);
   }
 
   logAction(d.role,"Set Week Game",{week:d.week,game:d.game},e);
@@ -31,15 +32,22 @@ function setReleaseStatus(d,e){
   const ok=(d.role==="owner"&&isOwner(d.code))||(d.role==="admin"&&isAdmin(d.code));
   if(!ok)return{ok:false,message:"Invalid code."};
 
+  const chosenGame=getWeekGame(d.week);
+
   setSetting(settingKey(d.week,d.releaseType),d.status);
 
   if(d.status==="Open"){
+    // This is the exact open round. Players can only play this week + round + game.
+    setSetting(activeGameKey(d.week,d.releaseType),chosenGame);
     setSetting("Active Provider Week",d.week);
     setSetting("Active Provider Release Type",d.releaseType);
-    setSetting("Active Provider Game",getWeekGame(d.week));
+    setSetting("Active Provider Game",chosenGame);
   }
 
   if(d.status==="Closed"){
+    // Closing the active round ends the game. No new joins or rejoins are allowed while closed.
+    setSetting(settingKey(d.week,d.releaseType),"Closed");
+    setSetting(activeGameKey(d.week,d.releaseType),"");
     const m=getSettingsMap();
     if(m["Active Provider Week"]===d.week && m["Active Provider Release Type"]===d.releaseType){
       setSetting("Active Provider Week","");
@@ -48,8 +56,8 @@ function setReleaseStatus(d,e){
     }
   }
 
-  logAction(d.role,"Set Release Status",{week:d.week,releaseType:d.releaseType,status:d.status,activeGame:getWeekGame(d.week)},e);
-  return{ok:true,message:settingKey(d.week,d.releaseType)+" is now "+d.status,active:{week:d.week,releaseType:d.releaseType,game:getWeekGame(d.week),status:d.status}};
+  logAction(d.role,"Set Release Status",{week:d.week,releaseType:d.releaseType,status:d.status,activeGame:chosenGame},e);
+  return{ok:true,message:settingKey(d.week,d.releaseType)+" is now "+d.status,active:{week:d.week,releaseType:d.releaseType,game:chosenGame,status:d.status}};
 }
 function ensurePlayer(name){const sh=sheet(SHEETS.PLAYERS);const nn=norm(name), niceName=nice(name);const v=sh.getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][1]===nn)return{nameNice:v[i][0],nameNorm:nn};}sh.appendRow([niceName,nn,now(),"","Active"]);return{nameNice:niceName,nameNorm:nn};}
 function updateNameInSheet(sheetName, normCol, displayCol, oldNorm, newNorm, newNice){const sh=sheet(sheetName);const v=sh.getDataRange().getValues();let changed=0;for(let i=1;i<v.length;i++){if(v[i][normCol]===oldNorm){sh.getRange(i+1,normCol+1).setValue(newNorm);if(displayCol!==null)sh.getRange(i+1,displayCol+1).setValue(newNice);changed++;}}return changed;}
@@ -93,33 +101,51 @@ function getActiveProviderRound(d){
   const m=getSettingsMap();
   const week=m["Active Provider Week"]||"";
   const releaseType=m["Active Provider Release Type"]||"";
-  const game=m["Active Provider Game"]||"";
   if(!week||!releaseType)return{ok:true,active:null,message:"No active provider round is currently open."};
-  return{ok:true,active:{week:week,releaseType:releaseType,game:game||getWeekGame(week)},message:"Active provider round loaded."};
-}
 
+  if(!isReleased(week,releaseType)){
+    return{ok:true,active:null,message:"No active provider round is currently open."};
+  }
+
+  const game=m["Active Provider Game"]||m[activeGameKey(week,releaseType)]||getWeekGame(week);
+
+  return{ok:true,active:{week:week,releaseType:releaseType,game:game},message:"Active provider round loaded."};
+}
 function findStartedAny(nm,week,type){const v=sheet(SHEETS.PLAYS).getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][2]===nm&&v[i][3]===week&&v[i][13]===type&&v[i][11]==="Started")return{row:i+1,values:v[i]};}return null;}
 function completedExact(nm,week,game,type){const v=sheet(SHEETS.PLAYS).getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][2]===nm&&v[i][3]===week&&v[i][4]===game&&v[i][13]===type&&v[i][11]==="Completed")return true;}return false;}
 function completedMainAny(nm,week){const v=sheet(SHEETS.PLAYS).getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][2]===nm&&v[i][3]===week&&v[i][13]==="main"&&v[i][11]==="Completed")return true;}return false;}
 function joinGame(d,e){
   const p=ensurePlayer(d.name);
-  const week=d.week;
-  const type=d.releaseType;
-  const selectedGame=getWeekGame(week);
+  const active=getActiveProviderRound({}).active;
+
+  if(!active||!active.week||!active.releaseType||!active.game){
+    return{ok:false,message:"No provider game is currently open. Admin/Owner must open a week and game first."};
+  }
+
+  const week=active.week;
+  const type=active.releaseType;
+  const activeGame=active.game;
 
   if(!isReleased(week,type)){
-    logSuspicious(d.name,"Tried closed round",{week,type,game:selectedGame});
+    logSuspicious(d.name,"Tried closed round",{week,type,game:activeGame});
     return{ok:false,message:"This round is closed. Admin/owner must open it first."};
   }
 
-  // Rejoin is checked BEFORE completed checks so an unfinished game can always resume while open.
+  // Rejoin only while the same exact active round is open.
   const startedAny=findStartedAny(p.nameNorm,week,type);
   if(startedAny){
     const resumedGame=startedAny.values[4];
+
+    if(resumedGame!==activeGame){
+      return{ok:false,message:"A different game is now active. Your old unfinished game is no longer joinable."};
+    }
+
     return{
       ok:true,
       resume:true,
       playId:startedAny.values[0],
+      week:week,
+      releaseType:type,
       game:resumedGame,
       statusText:type==="redemption"?"Redemption Open":"Game Open",
       progress:{
@@ -127,12 +153,12 @@ function joinGame(d,e){
         score:Number(startedAny.values[17]||0),
         correct:Number(startedAny.values[18]||0)
       },
-      message:"Unfinished game restored."
+      message:"Unfinished active game restored."
     };
   }
 
-  if(completedExact(p.nameNorm,week,selectedGame,type)){
-    return{ok:false,message:"Sorry, this name has already completed this round."};
+  if(completedExact(p.nameNorm,week,activeGame,type)){
+    return{ok:false,message:"Sorry, this name has already completed this active round."};
   }
 
   if(type==="redemption"&&completedMainAny(p.nameNorm,week)){
@@ -140,9 +166,10 @@ function joinGame(d,e){
   }
 
   const playId=uuid();
-  sheet(SHEETS.PLAYS).appendRow([playId,p.nameNice,p.nameNorm,week,selectedGame,now(),"",0,0,0,"","Started","",type,false,false,0,0,0]);
-  logAction("player","Join Game",{name:p.nameNice,week,game:selectedGame,type},e);
-  return{ok:true,resume:false,playId,game:selectedGame,statusText:type==="redemption"?"Redemption Open":"Game Open"};
+  sheet(SHEETS.PLAYS).appendRow([playId,p.nameNice,p.nameNorm,week,activeGame,now(),"",0,0,0,"","Started","",type,false,false,0,0,0]);
+  logAction("player","Join Active Game",{name:p.nameNice,week,game:activeGame,type},e);
+
+  return{ok:true,resume:false,playId,week:week,releaseType:type,game:activeGame,statusText:type==="redemption"?"Redemption Open":"Game Open"};
 }
 function saveProgress(d,e){const sh=sheet(SHEETS.PLAYS);const v=sh.getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][0]===d.playId&&v[i][11]==="Started"){sh.getRange(i+1,17,1,3).setValues([[Number(d.qIndex||0),Number(d.score||0),Number(d.correct||0)]]);return{ok:true};}}return{ok:false,message:"Session not found"};}
 function submitScore(d,e){const sh=sheet(SHEETS.PLAYS);const v=sh.getDataRange().getValues();let row=null;for(let i=1;i<v.length;i++)if(v[i][0]===d.playId)row=i+1;if(!row)return{ok:false,message:"Play session not found."};const start=sh.getRange(row,6).getValue();const elapsed=start?Math.round((now()-new Date(start))/60000):"";const score=Number(d.score||0);let fair=score>105||elapsed<1?"Review":"OK";sh.getRange(row,7,1,12).setValues([[now(),score,Number(d.correct||0),Number(d.answered||0),elapsed,"Completed",fair,d.releaseType,Boolean(d.prizeEligible),Number(d.answered||0),score,Number(d.correct||0)]]);if(fair==="Review")logSuspicious(d.name,"Score flagged",{score,elapsed});logAction("player","Submit Score",{name:d.name,week:d.week,game:d.game,score,fair,badge:d.badge||"",difficulty:d.difficulty||""},e);return{ok:true,message:"Game complete. Final score: "+score,fairFlag:fair};}
