@@ -53,17 +53,40 @@ function setReleaseStatus(d,e){
 }
 function ensurePlayer(name){const sh=sheet(SHEETS.PLAYERS);const nn=norm(name), niceName=nice(name);const v=sh.getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][1]===nn)return{nameNice:v[i][0],nameNorm:nn};}sh.appendRow([niceName,nn,now(),"","Active"]);return{nameNice:niceName,nameNorm:nn};}
 function updateNameInSheet(sheetName, normCol, displayCol, oldNorm, newNorm, newNice){const sh=sheet(sheetName);const v=sh.getDataRange().getValues();let changed=0;for(let i=1;i<v.length;i++){if(v[i][normCol]===oldNorm){sh.getRange(i+1,normCol+1).setValue(newNorm);if(displayCol!==null)sh.getRange(i+1,displayCol+1).setValue(newNice);changed++;}}return changed;}
-function renamePlayerTypo(d,e){const ok=(d.role==="owner"&&isOwner(d.code))||(d.role==="admin"&&isAdmin(d.code));if(!ok)return{ok:false,message:"Invalid code."};const oldNorm=norm(d.oldName),newNorm=norm(d.newName),newNice=nice(d.newName);if(!oldNorm||!newNorm)return{ok:false,message:"Old name and new name are required."};const changed={players:updateNameInSheet(SHEETS.PLAYERS,1,0,oldNorm,newNorm,newNice),plays:updateNameInSheet(SHEETS.PLAYS,2,1,oldNorm,newNorm,newNice),adjustments:updateNameInSheet(SHEETS.ADJUSTMENTS,2,1,oldNorm,newNorm,newNice),suspicious:updateNameInSheet(SHEETS.SUSPICIOUS,2,1,oldNorm,newNorm,newNice)};logAction(d.role,"Fix Typo / Rename Player",{oldName:d.oldName,newName:d.newName,changed},e);return{ok:true,message:"Player name typo fixed.",changed};}
+function renamePlayerTypo(d,e){
+  const ok=(d.role==="owner"&&isOwner(d.code))||(d.role==="admin"&&isAdmin(d.code));
+  if(!ok)return{ok:false,message:"Invalid code."};
 
-function getActiveProviderRound(d){
-  const m=getSettingsMap();
-  const week=m["Active Provider Week"]||"";
-  const releaseType=m["Active Provider Release Type"]||"";
-  const game=m["Active Provider Game"]||"";
-  if(!week||!releaseType)return{ok:true,active:null,message:"No active provider round is currently open."};
-  return{ok:true,active:{week:week,releaseType:releaseType,game:game||getWeekGame(week)},message:"Active provider round loaded."};
+  const oldNorm=norm(d.oldName);
+  const newNorm=norm(d.newName);
+  const newNice=nice(d.newName);
+
+  if(!oldNorm||!newNorm)return{ok:false,message:"Old name and new name are required."};
+  if(oldNorm===newNorm)return{ok:false,message:"Old name and new name are the same."};
+
+  // This migrates every active/incomplete/completed record to the corrected name.
+  // The incorrect old name is then unused, so entering it later starts as a brand-new player.
+  const changed={
+    players:updateNameInSheet(SHEETS.PLAYERS,1,0,oldNorm,newNorm,newNice),
+    plays:updateNameInSheet(SHEETS.PLAYS,2,1,oldNorm,newNorm,newNice),
+    adjustments:updateNameInSheet(SHEETS.ADJUSTMENTS,2,1,oldNorm,newNorm,newNice),
+    suspicious:updateNameInSheet(SHEETS.SUSPICIOUS,2,1,oldNorm,newNorm,newNice)
+  };
+
+  // If no Players row changed but there are migrated plays/adjustments, make sure the corrected player exists.
+  if(changed.players===0 && (changed.plays>0 || changed.adjustments>0 || changed.suspicious>0)){
+    ensurePlayer(newNice);
+  }
+
+  logAction(d.role,"Fix Typo / Rename Player Preserve Rejoin",{oldName:d.oldName,newName:d.newName,oldNorm,newNorm,changed},e);
+
+  return{
+    ok:true,
+    message:"Player name corrected. The corrected name keeps active progress/history. The old typo is now unused and would start fresh.",
+    changed,
+    correctedName:newNice
+  };
 }
-
 function findStarted(nm,week,game,type){const v=sheet(SHEETS.PLAYS).getDataRange().getValues();for(let i=1;i<v.length;i++){if(v[i][2]===nm&&v[i][3]===week&&v[i][4]===game&&v[i][13]===type&&v[i][11]==="Started")return{row:i+1,values:v[i]};}return null;}
 
 function getActiveProviderRound(d){
