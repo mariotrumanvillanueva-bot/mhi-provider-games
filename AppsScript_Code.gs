@@ -1,9 +1,9 @@
 const ADMIN_CODE="MHI-ADMIN-FRIDAY-2026";
 const OWNER_CODE="MHI-OWNER-MARIO-TV-2026";
 const TEMP_ADMIN_MINUTES=60;
-const SHEETS={SETTINGS:"Settings",PLAYERS:"Players",PLAYS:"Plays",ADJUSTMENTS:"Adjustments",ACTION_LOGS:"Action Logs",TEMP_CODES:"Temporary Admin Codes",SUSPICIOUS:"Suspicious Activity",FUN_SCORES:"Fun Scores",CORRECTIONS:"Name Corrections"};
+const SHEETS={SETTINGS:"Settings",PLAYERS:"Players",PLAYS:"Plays",ADJUSTMENTS:"Adjustments",ACTION_LOGS:"Action Logs",TEMP_CODES:"Temporary Admin Codes",SUSPICIOUS:"Suspicious Activity",FUN_SCORES:"Fun Scores",CORRECTIONS:"Name Corrections",BONUS_POINTS:"External Bonus Points"};
 function doPost(e){try{const data=JSON.parse(e.postData.contents||"{}");const a=data.action;
-if(a==="joinGame")return json(joinGame(data,e));if(a==="saveProgress")return json(saveProgress(data,e));if(a==="submitScore")return json(submitScore(data,e));if(a==="leaderboard")return json(getLeaderboard());if(a==="exportLeaderboard")return json(exportLeaderboard(data,e));if(a==="adminVerify")return json({ok:isAdmin(data.code)});if(a==="ownerVerify")return json({ok:isOwner(data.code)});if(a==="setReleaseStatus")return json(setReleaseStatus(data,e));if(a==="setWeekGame")return json(setWeekGame(data,e));if(a==="renamePlayerTypo")return json(renamePlayerTypo(data,e));if(a==="fairPlayAudit")return json(fairPlayAudit(data));if(a==="ownerAdjust")return json(ownerAdjust(data,e));if(a==="ownerResetPlayerRound")return json(ownerResetPlayerRound(data,e));if(a==="ownerArchiveResetLeaderboard")return json(ownerArchiveResetLeaderboard(data,e));if(a==="ownerDeletePlayer")return json(ownerDeletePlayer(data,e));if(a==="ownerDeletePlayerCompletely")return json(ownerDeletePlayer(data,e));if(a==="generateTempAdminCode")return json(generateTempAdminCode(data,e));if(a==="getActionLogs")return json(getActionLogs(data));if(a==="getSuspiciousActivity")return json(getSuspiciousActivity(data));if(a==="internalSummaryReport")return json(internalSummaryReport(data));if(a==="participationReport")return json(participationReport(data));if(a==="redemptionReport")return json(redemptionReport(data));if(a==="prizePointsReport")return json(prizePointsReport(data));if(a==="getActiveProviderRound")return json(getActiveProviderRound(data));if(a==="submitFunScore")return json(submitFunScore(data,e));if(a==="funLeaderboard")return json(funLeaderboard(data));if(a==="deleteFunUser")return json(deleteFunUser(data,e));if(a==="deepAuditReport")return json(deepAuditReport(data));return json({ok:false,message:"Unknown action."});}catch(err){return json({ok:false,message:String(err)});}}
+if(a==="joinGame")return json(joinGame(data,e));if(a==="saveProgress")return json(saveProgress(data,e));if(a==="submitScore")return json(submitScore(data,e));if(a==="leaderboard")return json(getLeaderboard());if(a==="exportLeaderboard")return json(exportLeaderboard(data,e));if(a==="adminVerify")return json({ok:isAdmin(data.code)});if(a==="ownerVerify")return json({ok:isOwner(data.code)});if(a==="setReleaseStatus")return json(setReleaseStatus(data,e));if(a==="setWeekGame")return json(setWeekGame(data,e));if(a==="renamePlayerTypo")return json(renamePlayerTypo(data,e));if(a==="fairPlayAudit")return json(fairPlayAudit(data));if(a==="ownerAdjust")return json(ownerAdjust(data,e));if(a==="ownerResetPlayerRound")return json(ownerResetPlayerRound(data,e));if(a==="ownerArchiveResetLeaderboard")return json(ownerArchiveResetLeaderboard(data,e));if(a==="ownerDeletePlayer")return json(ownerDeletePlayer(data,e));if(a==="ownerDeletePlayerCompletely")return json(ownerDeletePlayer(data,e));if(a==="generateTempAdminCode")return json(generateTempAdminCode(data,e));if(a==="getActionLogs")return json(getActionLogs(data));if(a==="getSuspiciousActivity")return json(getSuspiciousActivity(data));if(a==="internalSummaryReport")return json(internalSummaryReport(data));if(a==="participationReport")return json(participationReport(data));if(a==="redemptionReport")return json(redemptionReport(data));if(a==="prizePointsReport")return json(prizePointsReport(data));if(a==="getActiveProviderRound")return json(getActiveProviderRound(data));if(a==="submitFunScore")return json(submitFunScore(data,e));if(a==="funLeaderboard")return json(funLeaderboard(data));if(a==="deleteFunUser")return json(deleteFunUser(data,e));if(a==="deepAuditReport")return json(deepAuditReport(data));if(a==="setupBonusPointsSheet")return json(setupBonusPointsSheet(data,e));return json({ok:false,message:"Unknown action."});}catch(err){return json({ok:false,message:String(err)});}}
 function json(o){return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);}
 function ss(){return SpreadsheetApp.getActiveSpreadsheet();}function sheet(n){return ss().getSheetByName(n);}function now(){return new Date();}function norm(n){return String(n||"").trim().replace(/\s+/g," ").toLowerCase();}function nice(n){return String(n||"").trim().replace(/\s+/g," ");}function uuid(){return Utilities.getUuid();}
 function isOwner(c){return String(c||"")===OWNER_CODE;}function isAdmin(c){return String(c||"")===ADMIN_CODE||isTempAdmin(c);}function canExport(c){return isAdmin(c)||isOwner(c);}function boolValue(v){return v===true||v==="TRUE"||v==="true";}
@@ -276,8 +276,46 @@ function ownerDeletePlayer(d,e){
   logAction("owner","Delete Player Completely",{name:d.name,normalizedName:nameNorm,deleted},e);
   return{ok:true,message:"Player completely deleted from Provider Coordinator records.",deleted};
 }
-function getLeaderboard(){const totals={};const plays=sheet(SHEETS.PLAYS).getDataRange().getValues();for(let i=1;i<plays.length;i++){if(plays[i][11]!=="Completed")continue;const key=plays[i][2],name=plays[i][1],score=Number(plays[i][7]||0),prize=boolValue(plays[i][14]);if(!totals[key])totals[key]={name,totalPoints:0,prizePoints:0,gamesPlayed:0,badges:{}};totals[key].totalPoints+=score;totals[key].gamesPlayed++;if(prize)totals[key].prizePoints+=score;totals[key].badges[plays[i][4]]=true;}const adj=sheet(SHEETS.ADJUSTMENTS).getDataRange().getValues();for(let i=1;i<adj.length;i++){const key=adj[i][2],name=adj[i][1],pts=Number(adj[i][3]||0);if(!totals[key])totals[key]={name,totalPoints:0,prizePoints:0,gamesPlayed:0};totals[key].totalPoints+=pts;}const badgeNames={"Movie Trivia":"Movie Buff","Guess the Quote":"Quote Master","Emoji Movie Guess":"Emoji Expert","Word Scramble":"Word Wizard","Select All":"Sharp Selector","Matching":"Match Maker","Kahoot Practice":"Kahoot Champion"};const list=Object.values(totals).map(r=>{r.badges=Object.keys(r.badges||{}).map(g=>badgeNames[g]||g).join(", ");return r;});return{ok:true,leaderboard:list.sort((a,b)=>b.totalPoints-a.totalPoints).slice(0,40)};}
-function exportLeaderboard(d,e){if(!canExport(d.code))return{ok:false,message:"Export denied."};const lb=getLeaderboard().leaderboard;const rows=[["Rank","Name","Total Points","Prize Points","Games Played"]];lb.forEach((r,i)=>rows.push([i+1,r.name,r.totalPoints,r.prizePoints,r.gamesPlayed]));return{ok:true,rows};}
+
+function ensureExternalBonusSheet(){
+  let sh=ss().getSheetByName(SHEETS.BONUS_POINTS);
+  if(!sh){
+    sh=ss().insertSheet(SHEETS.BONUS_POINTS);
+    sh.appendRow(["Date","Name","Normalized Name","Week","Bonus Type","Points","Reason","Added By","Notes"]);
+  }
+  if(sh.getLastRow()===0){
+    sh.appendRow(["Date","Name","Normalized Name","Week","Bonus Type","Points","Reason","Added By","Notes"]);
+  }
+  return sh;
+}
+function getExternalBonusTotals(){
+  const sh=ensureExternalBonusSheet();
+  const v=sh.getDataRange().getValues();
+  const totals={};
+  for(let i=1;i<v.length;i++){
+    const name=String(v[i][1]||"").trim();
+    const normName=norm(v[i][2]||name);
+    const pts=Number(v[i][5]||0);
+    if(!normName || !pts)continue;
+    if(!totals[normName])totals[normName]={name:name||normName,total:0,rows:0};
+    totals[normName].total+=pts;
+    totals[normName].rows++;
+    // Auto-fill normalized name if blank so spreadsheet stays clean.
+    if(!v[i][2]) sh.getRange(i+1,3).setValue(normName);
+  }
+  return totals;
+}
+function setupBonusPointsSheet(d,e){
+  const ok=isOwner(d.code)||isAdmin(d.code);
+  if(!ok)return{ok:false,message:"Invalid code."};
+  ensureExternalBonusSheet();
+  logAction(isOwner(d.code)?"owner":"admin","Setup External Bonus Points Sheet",{},e);
+  return{ok:true,message:"External Bonus Points sheet is ready. Add bonus points there and refresh the leaderboard."};
+}
+
+function getLeaderboard(){const totals={};const plays=sheet(SHEETS.PLAYS).getDataRange().getValues();for(let i=1;i<plays.length;i++){if(plays[i][11]!=="Completed")continue;const key=plays[i][2],name=plays[i][1],score=Number(plays[i][7]||0),prize=boolValue(plays[i][14]);if(!totals[key])totals[key]={name,totalPoints:0,prizePoints:0,gamesPlayed:0,badges:{}};totals[key].totalPoints+=score;totals[key].gamesPlayed++;if(prize)totals[key].prizePoints+=score;totals[key].badges[plays[i][4]]=true;}const adj=sheet(SHEETS.ADJUSTMENTS).getDataRange().getValues();for(let i=1;i<adj.length;i++){const key=adj[i][2],name=adj[i][1],pts=Number(adj[i][3]||0);if(!totals[key])totals[key]={name,totalPoints:0,prizePoints:0,gamesPlayed:0,bonusPoints:0};totals[key].totalPoints+=pts;totals[key].bonusPoints=(totals[key].bonusPoints||0)+pts;}
+const bonus=getExternalBonusTotals();Object.keys(bonus).forEach(key=>{if(!totals[key])totals[key]={name:bonus[key].name,totalPoints:0,prizePoints:0,gamesPlayed:0,bonusPoints:0};totals[key].totalPoints+=bonus[key].total;totals[key].bonusPoints=(totals[key].bonusPoints||0)+bonus[key].total;});const badgeNames={"Movie Trivia":"Movie Buff","Guess the Quote":"Quote Master","Emoji Movie Guess":"Emoji Expert","Word Scramble":"Word Wizard","Select All":"Sharp Selector","Matching":"Match Maker","Kahoot Practice":"Kahoot Champion"};const list=Object.values(totals).map(r=>{r.badges=Object.keys(r.badges||{}).map(g=>badgeNames[g]||g).join(", ");return r;});return{ok:true,leaderboard:list.sort((a,b)=>b.totalPoints-a.totalPoints).slice(0,40)};}
+function exportLeaderboard(d,e){if(!canExport(d.code))return{ok:false,message:"Export denied."};const lb=getLeaderboard().leaderboard;const rows=[["Rank","Name","Total Points","Prize Points","Bonus/Adjustment Points","Games Played"]];lb.forEach((r,i)=>rows.push([i+1,r.name,r.totalPoints,r.prizePoints,r.bonusPoints||0,r.gamesPlayed]));return{ok:true,rows};}
 function fairPlayAudit(d){if(!isAdmin(d.code)&&!isOwner(d.code))return{ok:false,message:"Invalid code."};const v=sheet(SHEETS.PLAYS).getDataRange().getValues();const seen={},issues=[];for(let i=1;i<v.length;i++){if(v[i][11]!=="Completed")continue;const key=v[i][2]+"|"+v[i][3]+"|"+v[i][4]+"|"+v[i][13];seen[key]=(seen[key]||0)+1;if(seen[key]>1)issues.push({row:i+1,issue:"Duplicate completion",name:v[i][1]});if(v[i][12]==="Review")issues.push({row:i+1,issue:"Marked for review",name:v[i][1],game:v[i][4]});}const suspicious=sheet(SHEETS.SUSPICIOUS).getDataRange().getValues();
   for(let j=1;j<suspicious.length;j++){
     if(String(suspicious[j][3]||"").indexOf("Corrected typo re-entered")>=0){
