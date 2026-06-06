@@ -131,8 +131,8 @@ const GAME_BANK = {
     questions: [
       {difficulty:"easy",q:"Unscramble: MLIF",answer:"film"},
       {difficulty:"easy",q:"Unscramble: COTAR",answer:"actor"},
-      {difficulty:"easy",q:"Unscramble: POLT",answer:"plot"},
-      {difficulty:"medium",q:"Unscramble: POCORPN",answer:"popcorn"},
+      {difficulty:"easy",q:"Unscramble: TOLP",answer:"plot"},
+      {difficulty:"medium",q:"Unscramble: PCPRNOO",answer:"popcorn"},
       {difficulty:"medium",q:"Unscramble: NECES",answer:"scene"},
       {difficulty:"medium",q:"Unscramble: TLRPAIER",answer:"trailer"},
       {difficulty:"hard",q:"Unscramble: IOTRRCED",answer:"director"},
