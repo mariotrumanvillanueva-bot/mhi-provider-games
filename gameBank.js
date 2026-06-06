@@ -133,20 +133,20 @@ const GAME_BANK = {
       {difficulty:"easy",q:"Unscramble: COTAR",answer:"actor"},
       {difficulty:"easy",q:"Unscramble: POLT",answer:"plot"},
       {difficulty:"medium",q:"Unscramble: POCORPN",answer:"popcorn"},
-      {difficulty:"medium",q:"Unscramble: CESEN",answer:"scene"},
-      {difficulty:"medium",q:"Unscramble: TIRPALER",answer:"trailer"},
-      {difficulty:"hard",q:"Unscramble: ROTDICER",answer:"director"},
-      {difficulty:"hard",q:"Unscramble: PIRMEERE",answer:"premiere"},
-      {difficulty:"championship",q:"Unscramble: NICTAMERGOPHYA",answer:"cinematography"},
-      {difficulty:"championship",q:"Unscramble: ANILELIV",answer:"villain"}
+      {difficulty:"medium",q:"Unscramble: NECES",answer:"scene"},
+      {difficulty:"medium",q:"Unscramble: TLRPAIER",answer:"trailer"},
+      {difficulty:"hard",q:"Unscramble: IOTRRCED",answer:"director"},
+      {difficulty:"hard",q:"Unscramble: EIRPEMRE",answer:"premiere"},
+      {difficulty:"championship",q:"Unscramble: RICTAGENMOAHYP",answer:"cinematography"},
+      {difficulty:"championship",q:"Unscramble: LAVIINL",answer:"villain"}
     ],
     redemptionQuestions: [
       {difficulty:"easy",q:"Redemption unscramble: OREH",answer:"hero"},
-      {difficulty:"easy",q:"Redemption unscramble: CIMNEA",answer:"cinema"},
-      {difficulty:"medium",q:"Redemption unscramble: ORREHR",answer:"horror"},
-      {difficulty:"medium",q:"Redemption unscramble: MECOADY",answer:"comedy"},
+      {difficulty:"easy",q:"Redemption unscramble: CAMNEI",answer:"cinema"},
+      {difficulty:"medium",q:"Redemption unscramble: RHRORO",answer:"horror"},
+      {difficulty:"medium",q:"Redemption unscramble: MYOEDC",answer:"comedy"},
       {difficulty:"medium",q:"Redemption unscramble: DERITC",answer:"credit"},
-      {difficulty:"hard",q:"Redemption unscramble: KDCATSUONR",answer:"soundtrack"},
+      {difficulty:"hard",q:"Redemption unscramble: ORNATSUKCD",answer:"soundtrack"},
       {difficulty:"hard",q:"Redemption unscramble: EESPRLQU",answer:"prequels"},
       {difficulty:"championship",q:"Redemption unscramble: RTHAACCER",answer:"character"}
     ]
