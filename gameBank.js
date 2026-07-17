@@ -1,3 +1,19 @@
+const SCORE_RULES = {
+  correctAnswer: 10,
+  completion: 5,
+  finalCorrectAnswer: 12,
+  finalCompletion: 10,
+  tieBreakerCorrectAnswer: 15,
+  tieBreakerCompletion: 10
+};
+
+const MONTH_THEME = {
+  month: "July",
+  theme: "World Quest",
+  tagline: "Compete across continents. Conquer the globe.",
+  subtitle: "Explore. Discover. Compete."
+};
+
 const WEEK_DIFFICULTY = {
   "Week 1": "easy",
   "Week 2": "medium",
@@ -13,220 +29,245 @@ function difficultyForWeek(week) {
 function filterQuestionsForWeek(gameDef, week, redemption = false) {
   const pool = redemption ? gameDef.redemptionQuestions : gameDef.questions;
   const diff = difficultyForWeek(week);
+  let selected = [];
 
-  if (diff === "easy") {
-    return pool.filter(q => ["easy", "medium"].includes(q.difficulty)).slice(0, 7);
-  }
+  if (diff === "easy") selected = pool.filter(q => ["easy", "medium"].includes(q.difficulty));
+  else if (diff === "medium") selected = pool.filter(q => ["medium", "hard"].includes(q.difficulty));
+  else if (diff === "hard") selected = pool.filter(q => ["hard", "championship"].includes(q.difficulty));
+  else selected = pool.filter(q => ["medium", "hard", "championship"].includes(q.difficulty));
 
-  if (diff === "medium") {
-    return pool.filter(q => ["medium", "hard"].includes(q.difficulty)).slice(0, 8);
-  }
-
-  if (diff === "hard") {
-    return pool.filter(q => ["hard", "championship"].includes(q.difficulty)).slice(0, 10);
-  }
-
-  if (diff === "championship") {
-    return pool.filter(q => ["medium", "hard", "championship"].includes(q.difficulty)).slice(0, 15);
-  }
-
-  return pool.slice(0, 7);
+  if (selected.length < 5) selected = pool.slice();
+  return selected.slice(0, 10);
 }
 
 const BADGE_RULES = {
-  "Movie Trivia": "Movie Buff",
-  "Guess the Quote": "Quote Master",
-  "Emoji Movie Guess": "Emoji Expert",
-  "Word Scramble": "Word Wizard",
-  "Select All": "Sharp Selector",
-  "Matching": "Match Maker",
-  "Kahoot Practice": "Kahoot Champion"
+  "Flag Finder": "Flag Finder",
+  "Landmark Legends": "Landmark Legend",
+  "Map Quest": "Map Master",
+  "Culture Clues": "Culture Explorer",
+  "Empire Explorer": "History Voyager",
+  "World Scramble": "Word Traveler",
+  "Passport Matching": "Passport Pro",
+  "Global Showdown Kahoot": "Global Champion",
+  "World Quest Tie-Breaker": "Tie-Breaker Champion"
 };
 
 const GAME_BANK = {
-  "Movie Trivia": {
+  "Flag Finder": {
     prizeEligible: true,
     type: "choice",
     questions: [
-      {difficulty:"easy",q:"What does box office measure?",a:["Ticket sales","Movie length","Actor height","Snack prices"],c:0},
-      {difficulty:"easy",q:"What is a trailer?",a:["A preview","A full movie only","A theater seat","A camera"],c:0},
-      {difficulty:"easy",q:"A movie premiere is the...",a:["First public showing","Final scene","Poster","Snack counter"],c:0},
-      {difficulty:"medium",q:"Who leads the overall creative vision of a movie?",a:["Director","Audience","Ticket clerk","Composer only"],c:0},
-      {difficulty:"medium",q:"The written plan for a movie is a...",a:["Screenplay","Receipt","Trailer","Soundtrack"],c:0},
-      {difficulty:"medium",q:"What do credits list?",a:["People who worked on the movie","Ticket prices","Only snacks","Weather"],c:0},
-      {difficulty:"hard",q:"What is a prequel?",a:["A story set before the original","A snack preview","A deleted poster","A theater section"],c:0},
-      {difficulty:"hard",q:"What is continuity in film?",a:["Details staying consistent across scenes","Ticket price changes","Snack portions","The movie rating"],c:0},
-      {difficulty:"championship",q:"Which term means a new version of an older film?",a:["Remake","Sequel","Cameo","Matinee"],c:0},
-      {difficulty:"championship",q:"Which role is usually most responsible for arranging recorded footage into the final movie?",a:["Editor","Composer","Extra","Concession worker"],c:0}
+      {difficulty:"easy",q:"Which country has a red circle on a white flag?",a:["Japan","Canada","Brazil","Greece"],c:0},
+      {difficulty:"easy",q:"Which country’s flag is red and white with a maple leaf?",a:["Canada","Mexico","Norway","Kenya"],c:0},
+      {difficulty:"easy",q:"Which country’s flag is green, white, and red vertical stripes?",a:["Italy","Sweden","Argentina","Thailand"],c:0},
+      {difficulty:"medium",q:"Which country’s flag includes a Union Jack and stars?",a:["Australia","France","Egypt","Peru"],c:0},
+      {difficulty:"medium",q:"Which flag is known for blue and white stripes with a sun?",a:["Argentina","Morocco","Portugal","India"],c:0},
+      {difficulty:"medium",q:"Which country’s flag has a cedar tree?",a:["Lebanon","Spain","Turkey","South Korea"],c:0},
+      {difficulty:"hard",q:"Which country has a red flag with a white cross that does not reach the edges?",a:["Switzerland","Denmark","Finland","Georgia"],c:0},
+      {difficulty:"hard",q:"Which country’s flag includes a dragon?",a:["Bhutan","Nepal","Sri Lanka","Mongolia"],c:0},
+      {difficulty:"championship",q:"Which country has the only non-rectangular national flag?",a:["Nepal","Bhutan","Qatar","Maldives"],c:0},
+      {difficulty:"championship",q:"Which country’s flag features a large yellow five-pointed star on red?",a:["Vietnam","China","Morocco","Ghana"],c:0}
     ],
     redemptionQuestions: [
-      {difficulty:"easy",q:"Redemption: A scene is...",a:["A section of a movie","A ticket","A poster","A popcorn size"],c:0},
-      {difficulty:"easy",q:"Redemption: A sequel is...",a:["A follow-up movie","A receipt","A soundtrack","A camera"],c:0},
-      {difficulty:"medium",q:"Redemption: A plot twist is...",a:["Unexpected story change","Snack deal","Actor costume","Poster size"],c:0},
-      {difficulty:"medium",q:"Redemption: A cameo is...",a:["A brief appearance","A theater room","A snack size","A ticket booth"],c:0},
-      {difficulty:"medium",q:"Redemption: A film genre means...",a:["Type/category of movie","Ticket number","Actor age","Screen size"],c:0},
-      {difficulty:"hard",q:"Redemption: A stunt performer usually helps with...",a:["Dangerous action scenes","Selling tickets","Writing subtitles only","Cleaning theaters"],c:0},
-      {difficulty:"hard",q:"Redemption: What does cinematography focus on?",a:["How the movie is visually filmed","Who sells tickets","Snack pricing","The movie title font only"],c:0},
-      {difficulty:"championship",q:"Redemption: What does pacing describe?",a:["How fast or slow the story feels","The ticket line speed","The actor's height","The number of posters"],c:0}
+      {difficulty:"easy",q:"Make-Up: Which country’s flag is blue and yellow?",a:["Ukraine","Japan","Italy","Brazil"],c:0},
+      {difficulty:"easy",q:"Make-Up: Which country’s flag has red, white, and blue horizontal stripes?",a:["Netherlands","Portugal","India","Kenya"],c:0},
+      {difficulty:"medium",q:"Make-Up: Which country’s flag has a red maple leaf?",a:["Canada","Norway","Mexico","Chile"],c:0},
+      {difficulty:"medium",q:"Make-Up: Which country’s flag has a white crescent and star on red?",a:["Turkey","Greece","Egypt","Ireland"],c:0},
+      {difficulty:"hard",q:"Make-Up: Which country’s flag has a yellow cross on blue?",a:["Sweden","Finland","Iceland","Denmark"],c:0},
+      {difficulty:"hard",q:"Make-Up: Which country has a green pentagram on a red flag?",a:["Morocco","Vietnam","Turkey","Pakistan"],c:0},
+      {difficulty:"championship",q:"Make-Up: Which country’s flag includes a temple symbol?",a:["Cambodia","Laos","Thailand","Malaysia"],c:0}
     ]
   },
 
-  "Guess the Quote": {
+  "Landmark Legends": {
     prizeEligible: true,
     type: "choice",
     questions: [
-      {difficulty:"easy",q:"'May the Force be with you' is from...",a:["Star Wars","Titanic","Frozen","Jaws"],c:0},
-      {difficulty:"easy",q:"'Just keep swimming' is from...",a:["Finding Nemo","Cars","Rocky","Shrek"],c:0},
-      {difficulty:"easy",q:"'To infinity and beyond' is from...",a:["Toy Story","Moana","Avatar","Jumanji"],c:0},
-      {difficulty:"medium",q:"'I'll be back' is from...",a:["The Terminator","Toy Story","Up","Coco"],c:0},
-      {difficulty:"medium",q:"'There's no place like home' is from...",a:["The Wizard of Oz","Frozen","Jaws","Batman"],c:0},
-      {difficulty:"medium",q:"'Why so serious?' is linked to...",a:["The Dark Knight","Cars","Frozen","Up"],c:0},
-      {difficulty:"hard",q:"'I'm king of the world!' is linked to...",a:["Titanic","Up","Cars","Coco"],c:0},
-      {difficulty:"hard",q:"'Here's looking at you, kid' is linked to...",a:["Casablanca","Toy Story","Moana","Frozen"],c:0},
-      {difficulty:"championship",q:"'You shall not pass!' is linked to...",a:["Lord of the Rings","Finding Nemo","Grease","Jumanji"],c:0},
-      {difficulty:"championship",q:"'Life is like a box of chocolates' is linked to...",a:["Forrest Gump","Titanic","Rocky","Avatar"],c:0}
+      {difficulty:"easy",q:"The Eiffel Tower is located in which city?",a:["Paris","Rome","Berlin","Madrid"],c:0},
+      {difficulty:"easy",q:"The Great Pyramid of Giza is located in which country?",a:["Egypt","Peru","India","Greece"],c:0},
+      {difficulty:"easy",q:"The Colosseum is in which city?",a:["Rome","Athens","Cairo","London"],c:0},
+      {difficulty:"medium",q:"Machu Picchu is located in which country?",a:["Peru","Mexico","Chile","Spain"],c:0},
+      {difficulty:"medium",q:"The Taj Mahal is in which country?",a:["India","Iran","Turkey","Thailand"],c:0},
+      {difficulty:"medium",q:"The Acropolis is a famous landmark in which country?",a:["Greece","Italy","Egypt","Jordan"],c:0},
+      {difficulty:"hard",q:"Petra, famous for rock-cut architecture, is in which country?",a:["Jordan","Morocco","Egypt","Turkey"],c:0},
+      {difficulty:"hard",q:"Angkor Wat is located in which country?",a:["Cambodia","Vietnam","Thailand","Laos"],c:0},
+      {difficulty:"championship",q:"Chichén Itzá is associated with which civilization?",a:["Maya","Inca","Roman","Mongol"],c:0},
+      {difficulty:"championship",q:"The ancient city of Ephesus is in modern-day...",a:["Turkey","Greece","Italy","Lebanon"],c:0}
     ],
     redemptionQuestions: [
-      {difficulty:"easy",q:"Redemption quote: 'Hakuna Matata' is linked to...",a:["The Lion King","Titanic","Jaws","Rocky"],c:0},
-      {difficulty:"easy",q:"Redemption quote: 'Let it go' is linked to...",a:["Frozen","Jaws","Batman","Cars"],c:0},
-      {difficulty:"medium",q:"Redemption quote: 'Houston, we have a problem' is linked to...",a:["Apollo 13","Shrek","Scream","Elf"],c:0},
-      {difficulty:"medium",q:"Redemption quote: 'I see dead people' is linked to...",a:["The Sixth Sense","Up","Moana","Cars"],c:0},
-      {difficulty:"medium",q:"Redemption quote: 'Nobody puts Baby in a corner' is linked to...",a:["Dirty Dancing","Toy Story","Coco","Jaws"],c:0},
-      {difficulty:"hard",q:"Redemption quote: 'Roads? Where we're going, we don't need roads.' is linked to...",a:["Back to the Future","Avatar","Frozen","Rocky"],c:0},
-      {difficulty:"hard",q:"Redemption quote: 'Keep the change, ya filthy animal' is linked to...",a:["Home Alone","Titanic","Elf","Cars"],c:0},
-      {difficulty:"championship",q:"Redemption quote: 'I'm walking here!' is linked to...",a:["Midnight Cowboy","Shrek","Up","Jaws"],c:0}
+      {difficulty:"easy",q:"Make-Up: The Statue of Liberty is in which U.S. city?",a:["New York City","Chicago","Miami","Boston"],c:0},
+      {difficulty:"easy",q:"Make-Up: The Leaning Tower is in which Italian city?",a:["Pisa","Rome","Milan","Venice"],c:0},
+      {difficulty:"medium",q:"Make-Up: Stonehenge is located in which country?",a:["England","Ireland","France","Germany"],c:0},
+      {difficulty:"medium",q:"Make-Up: The Sydney Opera House is in which country?",a:["Australia","New Zealand","Canada","South Africa"],c:0},
+      {difficulty:"hard",q:"Make-Up: The Forbidden City is in which city?",a:["Beijing","Shanghai","Seoul","Tokyo"],c:0},
+      {difficulty:"hard",q:"Make-Up: The Alhambra is located in which country?",a:["Spain","Portugal","Morocco","Italy"],c:0},
+      {difficulty:"championship",q:"Make-Up: The Moai statues are on which island?",a:["Easter Island","Bali","Sicily","Crete"],c:0}
     ]
   },
 
-  "Emoji Movie Guess": {
+  "Map Quest": {
     prizeEligible: false,
     type: "choice",
     questions: [
-      {difficulty:"easy",q:"Guess the movie: 🧊👸❄️",a:["Frozen","Titanic","Jumanji","Up"],c:0},
-      {difficulty:"easy",q:"Guess the movie: 🦁👑",a:["The Lion King","Madagascar","Tarzan","Cars"],c:0},
-      {difficulty:"easy",q:"Guess the movie: 🧸🤠🚀",a:["Toy Story","Frozen","Jaws","Avatar"],c:0},
-      {difficulty:"medium",q:"Guess the movie: 🦈🌊🚤",a:["Jaws","Moana","Avatar","Finding Nemo"],c:0},
-      {difficulty:"medium",q:"Guess the movie: 🧙‍♂️⚡🏰",a:["Harry Potter","Shrek","Hocus Pocus","Thor"],c:0},
-      {difficulty:"medium",q:"Guess the movie: 🚗💨👮",a:["Fast & Furious","Cars","Speed","Taxi"],c:0},
-      {difficulty:"hard",q:"Guess the movie: 👽🚲🌕",a:["E.T.","Titanic","Elf","Grease"],c:0},
-      {difficulty:"hard",q:"Guess the movie: 🏠🎈👴",a:["Up","Jumanji","Moana","Avatar"],c:0},
-      {difficulty:"championship",q:"Guess the movie: 🦖🏝️🚙",a:["Jurassic Park","Titanic","Up","Elf"],c:0},
-      {difficulty:"championship",q:"Guess the movie: 🕷️🧑‍🦱🏙️",a:["Spider-Man","Batman","Superman","Frozen"],c:0}
+      {difficulty:"easy",q:"Which continent is Brazil located in?",a:["South America","Europe","Africa","Asia"],c:0},
+      {difficulty:"easy",q:"Which ocean is east of the United States?",a:["Atlantic Ocean","Pacific Ocean","Indian Ocean","Arctic Ocean"],c:0},
+      {difficulty:"easy",q:"Which country is both a country and a continent?",a:["Australia","Greenland","India","Egypt"],c:0},
+      {difficulty:"medium",q:"Which sea lies between Europe and North Africa?",a:["Mediterranean Sea","Caribbean Sea","Red Sea","Baltic Sea"],c:0},
+      {difficulty:"medium",q:"Which river is commonly associated with ancient Egypt?",a:["Nile River","Amazon River","Danube River","Ganges River"],c:0},
+      {difficulty:"medium",q:"Which mountain range separates France and Spain?",a:["Pyrenees","Andes","Himalayas","Alps"],c:0},
+      {difficulty:"hard",q:"Which country borders both Germany and Spain?",a:["France","Italy","Poland","Austria"],c:0},
+      {difficulty:"hard",q:"Which desert spans much of North Africa?",a:["Sahara","Gobi","Kalahari","Atacama"],c:0},
+      {difficulty:"championship",q:"Which strait separates Spain and Morocco?",a:["Strait of Gibraltar","Bering Strait","Bosporus","Strait of Malacca"],c:0},
+      {difficulty:"championship",q:"Which country is an archipelago in Southeast Asia?",a:["Indonesia","Mongolia","Bolivia","Nepal"],c:0}
     ],
     redemptionQuestions: [
-      {difficulty:"easy",q:"Redemption emoji: 🐠🌊🔍",a:["Finding Nemo","Cars","Rocky","Scream"],c:0},
-      {difficulty:"easy",q:"Redemption emoji: 🧌🫏👸",a:["Shrek","Titanic","Up","Coco"],c:0},
-      {difficulty:"medium",q:"Redemption emoji: 🤖❤️🌎",a:["WALL-E","Jaws","Cars","Frozen"],c:0},
-      {difficulty:"medium",q:"Redemption emoji: 🐀👨‍🍳🍝",a:["Ratatouille","Titanic","Up","Elf"],c:0},
-      {difficulty:"medium",q:"Redemption emoji: 🧛🩸🏰",a:["Dracula","Cars","Toy Story","Moana"],c:0},
-      {difficulty:"hard",q:"Redemption emoji: 👑💍🌋",a:["Lord of the Rings","Frozen","Jaws","Up"],c:0},
-      {difficulty:"hard",q:"Redemption emoji: 🧑‍🚀🌌🕳️",a:["Interstellar","Cars","Shrek","Grease"],c:0},
-      {difficulty:"championship",q:"Redemption emoji: 🎹🌊🚢",a:["The Piano","Titanic","Moana","Jaws"],c:0}
+      {difficulty:"easy",q:"Make-Up: Which continent is Kenya located in?",a:["Africa","Asia","Europe","South America"],c:0},
+      {difficulty:"easy",q:"Make-Up: Which ocean borders California?",a:["Pacific Ocean","Atlantic Ocean","Indian Ocean","Arctic Ocean"],c:0},
+      {difficulty:"medium",q:"Make-Up: The Amazon Rainforest is mostly in which country?",a:["Brazil","Egypt","China","Greece"],c:0},
+      {difficulty:"medium",q:"Make-Up: Which continent contains the Alps?",a:["Europe","Africa","Australia","North America"],c:0},
+      {difficulty:"hard",q:"Make-Up: Which country is directly south of the United States?",a:["Mexico","Canada","Cuba","Panama"],c:0},
+      {difficulty:"hard",q:"Make-Up: Which mountain range includes Mount Everest?",a:["Himalayas","Rockies","Andes","Atlas"],c:0},
+      {difficulty:"championship",q:"Make-Up: Which canal connects the Mediterranean Sea and Red Sea?",a:["Suez Canal","Panama Canal","Erie Canal","Grand Canal"],c:0}
     ]
   },
 
-  "Word Scramble": {
-    prizeEligible: false,
-    type: "typed",
-    questions: [
-      {difficulty:"easy",q:"Unscramble: MLIF",answer:"film"},
-      {difficulty:"easy",q:"Unscramble: COTAR",answer:"actor"},
-      {difficulty:"easy",q:"Unscramble: TOLP",answer:"plot"},
-      {difficulty:"medium",q:"Unscramble: PCPRNOO",answer:"popcorn"},
-      {difficulty:"medium",q:"Unscramble: NECES",answer:"scene"},
-      {difficulty:"medium",q:"Unscramble: TLRPAIER",answer:"trailer"},
-      {difficulty:"hard",q:"Unscramble: IOTRRCED",answer:"director"},
-      {difficulty:"hard",q:"Unscramble: EIRPEMRE",answer:"premiere"},
-      {difficulty:"championship",q:"Unscramble: RICTAGENMOAHYP",answer:"cinematography"},
-      {difficulty:"championship",q:"Unscramble: LAVIINL",answer:"villain"}
-    ],
-    redemptionQuestions: [
-      {difficulty:"easy",q:"Redemption unscramble: OREH",answer:"hero"},
-      {difficulty:"easy",q:"Redemption unscramble: CAMNEI",answer:"cinema"},
-      {difficulty:"medium",q:"Redemption unscramble: RHRORO",answer:"horror"},
-      {difficulty:"medium",q:"Redemption unscramble: MYOEDC",answer:"comedy"},
-      {difficulty:"medium",q:"Redemption unscramble: DERITC",answer:"credit"},
-      {difficulty:"hard",q:"Redemption unscramble: ORNATSUKCD",answer:"soundtrack"},
-      {difficulty:"hard",q:"Redemption unscramble: EESPRLQU",answer:"prequels"},
-      {difficulty:"championship",q:"Redemption unscramble: RTHAACCER",answer:"character"}
-    ]
-  },
-
-  "Select All": {
+  "Culture Clues": {
     prizeEligible: true,
     type: "selectAll",
     questions: [
-      {difficulty:"easy",q:"Select all movie snacks.",a:["Popcorn","Candy","Soda","Keyboard"],c:[0,1,2]},
-      {difficulty:"easy",q:"Select all movie jobs.",a:["Director","Actor","Editor","Printer"],c:[0,1,2]},
-      {difficulty:"easy",q:"Select all genres.",a:["Horror","Comedy","Drama","Stapler"],c:[0,1,2]},
-      {difficulty:"medium",q:"Select all movie terms.",a:["Scene","Plot","Trailer","Receipt"],c:[0,1,2]},
-      {difficulty:"medium",q:"Select all story pieces.",a:["Character","Setting","Conflict","Mousepad"],c:[0,1,2]},
-      {difficulty:"medium",q:"Select all movie formats.",a:["Sequel","Prequel","Short film","Spreadsheet"],c:[0,1,2]},
-      {difficulty:"hard",q:"Select all production terms.",a:["Script","Take","Casting","Microwave"],c:[0,1,2]},
-      {difficulty:"hard",q:"Select all film crew areas.",a:["Lighting","Sound","Editing","Payroll tax"],c:[0,1,2]},
-      {difficulty:"championship",q:"Select all story structure terms.",a:["Climax","Theme","Resolution","Keyboard"],c:[0,1,2]},
-      {difficulty:"championship",q:"Select all types of adapted/reworked films.",a:["Remake","Reboot","Spin-off","Receipt"],c:[0,1,2]}
+      {difficulty:"easy",q:"Select all languages commonly associated with Europe.",a:["French","German","Spanish","Swahili"],c:[0,1,2]},
+      {difficulty:"easy",q:"Select all foods strongly associated with Italy.",a:["Pizza","Pasta","Risotto","Sushi"],c:[0,1,2]},
+      {difficulty:"medium",q:"Select all items commonly associated with Japanese culture.",a:["Kimono","Sushi","Cherry blossoms","Pyramids of Giza"],c:[0,1,2]},
+      {difficulty:"medium",q:"Select all cultural items often associated with Mexico.",a:["Mariachi","Day of the Dead","Tacos","Eiffel Tower"],c:[0,1,2]},
+      {difficulty:"medium",q:"Select all religions that began in South Asia.",a:["Hinduism","Buddhism","Sikhism","Shinto"],c:[0,1,2]},
+      {difficulty:"hard",q:"Select all cities known for major historic trade routes or crossroads.",a:["Istanbul","Venice","Samarkand","Honolulu"],c:[0,1,2]},
+      {difficulty:"hard",q:"Select all writing systems historically tied to ancient civilizations.",a:["Hieroglyphs","Cuneiform","Maya glyphs","Morse code"],c:[0,1,2]},
+      {difficulty:"championship",q:"Select all terms tied to cultural exchange.",a:["Trade routes","Migration","Exploration","Latitude only"],c:[0,1,2]}
     ],
     redemptionQuestions: [
-      {difficulty:"easy",q:"Redemption: Select all theater items.",a:["Screen","Seats","Tickets","Toothbrush"],c:[0,1,2]},
-      {difficulty:"easy",q:"Redemption: Select all story roles.",a:["Hero","Villain","Sidekick","Receipt"],c:[0,1,2]},
-      {difficulty:"medium",q:"Redemption: Select all entertainment awards/shows.",a:["Oscar","Emmy","Tony","Oil change"],c:[0,1,2]},
-      {difficulty:"medium",q:"Redemption: Select all audience-facing movie items.",a:["Poster","Trailer","Ticket","Stapler"],c:[0,1,2]},
-      {difficulty:"medium",q:"Redemption: Select all things a script may include.",a:["Dialogue","Action lines","Scene headings","Snack prices"],c:[0,1,2]},
-      {difficulty:"hard",q:"Redemption: Select all post-production roles/tasks.",a:["Editing","Sound mixing","Visual effects","Concessions"],c:[0,1,2]},
-      {difficulty:"hard",q:"Redemption: Select all story conflict types.",a:["Person vs self","Person vs nature","Person vs society","Person vs popcorn"],c:[0,1,2]},
-      {difficulty:"championship",q:"Redemption: Select all film classification concepts.",a:["Rating","Genre","Runtime","Seat color"],c:[0,1,2]}
+      {difficulty:"easy",q:"Make-Up: Select all common world celebrations.",a:["Lunar New Year","Diwali","Carnival","Spreadsheet Day"],c:[0,1,2]},
+      {difficulty:"easy",q:"Make-Up: Select all foods associated with Japan.",a:["Sushi","Ramen","Tempura","Tacos"],c:[0,1,2]},
+      {difficulty:"medium",q:"Make-Up: Select all examples of cultural landmarks.",a:["Temples","Museums","Historic plazas","Printer paper"],c:[0,1,2]},
+      {difficulty:"medium",q:"Make-Up: Select all ways culture can be shared.",a:["Food","Music","Language","Keyboard shortcuts"],c:[0,1,2]},
+      {difficulty:"hard",q:"Make-Up: Select all historic centers of learning or culture.",a:["Alexandria","Athens","Baghdad","Las Vegas Strip"],c:[0,1,2]},
+      {difficulty:"championship",q:"Make-Up: Select all factors that can shape culture.",a:["Geography","Religion","Trade","Random font size"],c:[0,1,2]}
     ]
   },
 
-  "Matching": {
-    prizeEligible: false,
-    type: "matching",
-    questions: [
-      {difficulty:"easy",q:"Match the movie terms.",pairs:[["Trailer","Preview"],["Genre","Type"],["Actor","Performer"],["Credits","Worker list"],["Scene","Movie section"]]},
-      {difficulty:"easy",q:"Match the theater words.",pairs:[["Ticket","Entry pass"],["Screen","Movie display"],["Seat","Where you sit"],["Audience","People watching"],["Concession","Snack area"]]},
-      {difficulty:"medium",q:"Match the production roles.",pairs:[["Director","Leads vision"],["Editor","Arranges footage"],["Composer","Creates music"],["Critic","Reviews movies"],["Producer","Manages project"]]},
-      {difficulty:"medium",q:"Match the story words.",pairs:[["Hero","Main good character"],["Villain","Main bad character"],["Plot","Story events"],["Setting","Where/when story happens"],["Conflict","Main problem"]]},
-      {difficulty:"medium",q:"Match the movie types.",pairs:[["Comedy","Funny"],["Horror","Scary"],["Romance","Love story"],["Action","Fast-paced"],["Mystery","Puzzle/story secret"]]},
-      {difficulty:"hard",q:"Match movie sequence terms.",pairs:[["Sequel","Follow-up movie"],["Prequel","Story before original"],["Trilogy","Three related movies"],["Remake","New version"],["Spin-off","Related side story"]]},
-      {difficulty:"hard",q:"Match film creation terms.",pairs:[["Script","Written story"],["Take","Recorded attempt"],["Casting","Choosing actors"],["Set","Filming location"],["Props","Objects used"]]},
-      {difficulty:"championship",q:"Match story structure.",pairs:[["Beginning","Introduces story"],["Middle","Builds conflict"],["Climax","Big turning point"],["Ending","Wraps story"],["Theme","Main message"]]}
-    ],
-    redemptionQuestions: [
-      {difficulty:"easy",q:"Redemption matching: Basic film terms.",pairs:[["Film","Movie"],["Actor","Performer"],["Plot","Story"],["Scene","Part"],["Poster","Advertisement"]]},
-      {difficulty:"easy",q:"Redemption matching: Theater basics.",pairs:[["Aisle","Walkway"],["Matinee","Earlier showing"],["Ticket","Entry"],["Seat","Place to sit"],["Screen","Movie display"]]},
-      {difficulty:"medium",q:"Redemption matching: Movie people.",pairs:[["Star","Main performer"],["Extra","Background performer"],["Stunt double","Risky action"],["Writer","Creates script"],["Voice actor","Voice role"]]},
-      {difficulty:"medium",q:"Redemption matching: Story parts.",pairs:[["Character","Person in story"],["Setting","Place/time"],["Conflict","Problem"],["Resolution","Ending solution"],["Theme","Message"]]},
-      {difficulty:"medium",q:"Redemption matching: Film jobs.",pairs:[["Composer","Music"],["Editor","Cuts footage"],["Director","Creative lead"],["Producer","Project manager"],["Cinematographer","Camera visuals"]]},
-      {difficulty:"hard",q:"Redemption matching: Advanced terms.",pairs:[["Continuity","Consistency"],["Pacing","Story speed"],["Montage","Edited sequence"],["Foreshadowing","Hint of future"],["Climax","Turning point"]]},
-      {difficulty:"hard",q:"Redemption matching: Adaptation terms.",pairs:[["Adaptation","Based on another work"],["Reboot","Fresh restart"],["Remake","New version"],["Spin-off","Side story"],["Franchise","Series brand"]]},
-      {difficulty:"championship",q:"Redemption matching: Film analysis.",pairs:[["Tone","Overall feeling"],["Motif","Repeated element"],["Symbolism","Meaning through objects"],["Subtext","Hidden meaning"],["Arc","Character change"]]}
-    ]
-  },
-
-  "Kahoot Practice": {
+  "Empire Explorer": {
     prizeEligible: true,
     type: "choice",
     questions: [
-      {difficulty:"medium",q:"Kahoot: Which is a movie award?",a:["Oscar","Receipt","Stapler","Keyboard"],c:0},
-      {difficulty:"medium",q:"Kahoot: Which is a movie job?",a:["Director","Dentist only","Bank teller only","Pilot only"],c:0},
-      {difficulty:"medium",q:"Kahoot: Which means first showing?",a:["Premiere","Invoice","Spreadsheet","Receipt"],c:0},
-      {difficulty:"hard",q:"Kahoot: Which role most directly shapes the final order of scenes?",a:["Editor","Composer","Extra","Ticket seller"],c:0},
-      {difficulty:"hard",q:"Kahoot: Which term means a story set before the original?",a:["Prequel","Sequel","Cameo","Trailer"],c:0},
-      {difficulty:"hard",q:"Kahoot: Which term describes consistent details across shots?",a:["Continuity","Concession","Casting","Matinee"],c:0},
-      {difficulty:"championship",q:"Kahoot: Which term describes the speed and rhythm of a story?",a:["Pacing","Runtime only","Ticketing","Casting"],c:0},
-      {difficulty:"championship",q:"Kahoot: Which term means hidden meaning beneath dialogue/actions?",a:["Subtext","Subtitle","Soundtrack","Synopsis"],c:0},
-      {difficulty:"championship",q:"Kahoot: Which is a repeated image, phrase, or idea with meaning?",a:["Motif","Matinee","Montage only","Monologue only"],c:0},
-      {difficulty:"championship",q:"Kahoot: Which term means a character’s change over the story?",a:["Character arc","Seat row","Box office","Credit roll"],c:0}
+      {difficulty:"easy",q:"Which ancient civilization built pyramids at Giza?",a:["Egyptians","Romans","Vikings","Aztecs"],c:0},
+      {difficulty:"easy",q:"Which empire was centered in Rome?",a:["Roman Empire","Mali Empire","Inca Empire","Mongol Empire"],c:0},
+      {difficulty:"medium",q:"Which civilization is associated with Machu Picchu?",a:["Inca","Maya","Greek","Persian"],c:0},
+      {difficulty:"medium",q:"Which empire was founded by Genghis Khan?",a:["Mongol Empire","Ottoman Empire","Roman Empire","British Empire"],c:0},
+      {difficulty:"medium",q:"Which empire ruled from Constantinople for centuries?",a:["Byzantine Empire","Aztec Empire","Mali Empire","Qing Dynasty"],c:0},
+      {difficulty:"hard",q:"Which empire was known for Mansa Musa and wealth from gold?",a:["Mali Empire","Roman Empire","Inca Empire","Viking Kingdoms"],c:0},
+      {difficulty:"hard",q:"Which civilization is associated with city-states like Athens and Sparta?",a:["Ancient Greece","Ancient Egypt","Maya","Mongols"],c:0},
+      {difficulty:"championship",q:"Which empire controlled large parts of the Silk Road under its peak?",a:["Mongol Empire","Aztec Empire","Portuguese Empire","Zulu Kingdom"],c:0},
+      {difficulty:"championship",q:"Which empire was centered in present-day Turkey and lasted into the early 20th century?",a:["Ottoman Empire","Roman Empire","Inca Empire","Gupta Empire"],c:0}
     ],
     redemptionQuestions: [
-      {difficulty:"medium",q:"Kahoot redemption: Which is a movie genre?",a:["Drama","Printer","Pencil","Folder"],c:0},
-      {difficulty:"medium",q:"Kahoot redemption: Which is part of a story?",a:["Plot","Keyboard","Stapler","Receipt"],c:0},
-      {difficulty:"hard",q:"Kahoot redemption: Which person performs in a movie?",a:["Actor","Cash register","Spreadsheet","Calendar"],c:0},
-      {difficulty:"hard",q:"Kahoot redemption: Which means music from a movie?",a:["Soundtrack","Invoice","Name tag","Mousepad"],c:0},
-      {difficulty:"hard",q:"Kahoot redemption: Which is a follow-up movie?",a:["Sequel","Ticket booth","Seat row","Poster only"],c:0},
-      {difficulty:"championship",q:"Kahoot redemption: Which term means a new version that restarts a series?",a:["Reboot","Cameo","Genre","Score"],c:0},
-      {difficulty:"championship",q:"Kahoot redemption: Which term means a quick edited sequence showing time/action?",a:["Montage","Premiere","Aisle","Credit"],c:0}
+      {difficulty:"easy",q:"Make-Up: Which empire built many roads across Europe?",a:["Roman Empire","Inca Empire","Maya","Egyptians"],c:0},
+      {difficulty:"easy",q:"Make-Up: Cleopatra is strongly associated with which civilization?",a:["Egypt","Greece","Mongolia","Peru"],c:0},
+      {difficulty:"medium",q:"Make-Up: Which empire built an extensive road system in the Andes?",a:["Inca Empire","Roman Empire","Ottoman Empire","Persian Empire"],c:0},
+      {difficulty:"medium",q:"Make-Up: Which civilization used cuneiform in Mesopotamia?",a:["Sumerians","Vikings","Inca","Aztecs"],c:0},
+      {difficulty:"hard",q:"Make-Up: Which empire connected Europe and Asia through Constantinople?",a:["Byzantine Empire","Mali Empire","Maya","Qing Dynasty"],c:0},
+      {difficulty:"hard",q:"Make-Up: Which empire was known for Janissaries and sultans?",a:["Ottoman Empire","Roman Empire","Inca Empire","Mali Empire"],c:0},
+      {difficulty:"championship",q:"Make-Up: Which ruler is linked to the spread of Hellenistic culture?",a:["Alexander the Great","Julius Caesar","Mansa Musa","Kublai Khan"],c:0}
+    ]
+  },
+
+  "World Scramble": {
+    prizeEligible: false,
+    type: "typed",
+    questions: [
+      {difficulty:"easy",q:"Unscramble: ANPAJ",answer:"japan"},
+      {difficulty:"easy",q:"Unscramble: YGEPt",answer:"egypt"},
+      {difficulty:"easy",q:"Unscramble: RZEABLI",answer:"brazil"},
+      {difficulty:"medium",q:"Unscramble: FALGS",answer:"flags"},
+      {difficulty:"medium",q:"Unscramble: DLAMKARN",answer:"landmark"},
+      {difficulty:"medium",q:"Unscramble: GRYHOGPAE",answer:"geography"},
+      {difficulty:"hard",q:"Unscramble: AITNIOVZILIC",answer:"civilization"},
+      {difficulty:"hard",q:"Unscramble: TREEXRPLO",answer:"explorer"},
+      {difficulty:"championship",q:"Unscramble: TNEITNONC",answer:"continent"},
+      {difficulty:"championship",q:"Unscramble: POCRIALT",answer:"tropical"}
+    ],
+    redemptionQuestions: [
+      {difficulty:"easy",q:"Make-Up: Unscramble: INDAI",answer:"india"},
+      {difficulty:"easy",q:"Make-Up: Unscramble: APSNI",answer:"spain"},
+      {difficulty:"medium",q:"Make-Up: Unscramble: MCUERLTU",answer:"culture"},
+      {difficulty:"medium",q:"Make-Up: Unscramble: KIGNDOM",answer:"kingdom"},
+      {difficulty:"hard",q:"Make-Up: Unscramble: RMOIPE",answer:"empire"},
+      {difficulty:"hard",q:"Make-Up: Unscramble: GSINATCRIT",answer:"stratgic"},
+      {difficulty:"championship",q:"Make-Up: Unscramble: EERHITAG",answer:"heritage"}
+    ]
+  },
+
+  "Passport Matching": {
+    prizeEligible: false,
+    type: "matching",
+    questions: [
+      {difficulty:"easy",q:"Match the country to the landmark.",pairs:[["France","Eiffel Tower"],["Egypt","Great Pyramid"],["Italy","Colosseum"],["India","Taj Mahal"],["Peru","Machu Picchu"]]},
+      {difficulty:"easy",q:"Match the country to the continent.",pairs:[["Brazil","South America"],["Kenya","Africa"],["Japan","Asia"],["France","Europe"],["Canada","North America"]]},
+      {difficulty:"medium",q:"Match the civilization to a clue.",pairs:[["Roman","Colosseum"],["Inca","Andes"],["Maya","Chichén Itzá"],["Egyptian","Hieroglyphs"],["Greek","Athens"]]},
+      {difficulty:"medium",q:"Match the waterway to location.",pairs:[["Nile","Egypt"],["Amazon","South America"],["Mediterranean","Europe/North Africa"],["Ganges","India"],["Pacific","West Coast U.S."]]},
+      {difficulty:"hard",q:"Match the empire to a figure.",pairs:[["Mongol","Genghis Khan"],["Mali","Mansa Musa"],["Macedonian","Alexander the Great"],["Roman","Julius Caesar"],["Ottoman","Suleiman"]]},
+      {difficulty:"hard",q:"Match the term to meaning.",pairs:[["Archipelago","Group of islands"],["Peninsula","Land with water on three sides"],["Strait","Narrow water passage"],["Delta","River mouth landform"],["Equator","0° latitude"]]},
+      {difficulty:"championship",q:"Match the ancient route or region.",pairs:[["Silk Road","Eurasian trade"],["Sahara","North Africa"],["Andes","South America"],["Mesopotamia","Tigris/Euphrates"],["Polynesia","Pacific islands"]]}
+    ],
+    redemptionQuestions: [
+      {difficulty:"easy",q:"Make-Up: Match the country to capital.",pairs:[["France","Paris"],["Japan","Tokyo"],["Italy","Rome"],["Egypt","Cairo"],["Spain","Madrid"]]},
+      {difficulty:"easy",q:"Make-Up: Match landmark to country.",pairs:[["Great Wall","China"],["Acropolis","Greece"],["Petra","Jordan"],["Angkor Wat","Cambodia"],["Stonehenge","England"]]},
+      {difficulty:"medium",q:"Make-Up: Match culture clue.",pairs:[["Kimono","Japan"],["Mariachi","Mexico"],["Pasta","Italy"],["Samba","Brazil"],["Maple leaf","Canada"]]},
+      {difficulty:"medium",q:"Make-Up: Match explorer or route.",pairs:[["Magellan","Circumnavigation"],["Zheng He","Treasure voyages"],["Marco Polo","Asia travel"],["Ibn Battuta","Wide travels"],["Leif Erikson","Norse exploration"]]},
+      {difficulty:"hard",q:"Make-Up: Match historical region.",pairs:[["Mesopotamia","Modern Iraq region"],["Mesoamerica","Mexico/Central America"],["Nubia","Nile region"],["Anatolia","Modern Turkey region"],["Gaul","Ancient France region"]]},
+      {difficulty:"championship",q:"Make-Up: Match geography term.",pairs:[["Isthmus","Narrow land bridge"],["Plateau","High flat land"],["Steppe","Grassland plain"],["Fjord","Glacial inlet"],["Tundra","Cold treeless region"]]}
+    ]
+  },
+
+  "Global Showdown Kahoot": {
+    prizeEligible: true,
+    type: "choice",
+    questions: [
+      {difficulty:"medium",q:"Which country is home to the Taj Mahal?",a:["India","Egypt","Turkey","China"],c:0},
+      {difficulty:"medium",q:"Which civilization is linked to Machu Picchu?",a:["Inca","Maya","Roman","Greek"],c:0},
+      {difficulty:"hard",q:"Which empire was founded by Genghis Khan?",a:["Mongol Empire","Roman Empire","Mali Empire","Ottoman Empire"],c:0},
+      {difficulty:"hard",q:"Which country has the only non-rectangular national flag?",a:["Nepal","Japan","Brazil","Canada"],c:0},
+      {difficulty:"hard",q:"Which sea lies between Europe and North Africa?",a:["Mediterranean Sea","Red Sea","Baltic Sea","Caribbean Sea"],c:0},
+      {difficulty:"championship",q:"Which strait separates Spain and Morocco?",a:["Strait of Gibraltar","Bering Strait","Bosporus","Strait of Malacca"],c:0},
+      {difficulty:"championship",q:"Which ruler is associated with the Mali Empire’s wealth and pilgrimage?",a:["Mansa Musa","Julius Caesar","Genghis Khan","Cleopatra"],c:0},
+      {difficulty:"championship",q:"Which term means a group of islands?",a:["Archipelago","Peninsula","Delta","Plateau"],c:0},
+      {difficulty:"championship",q:"Which ancient trade network connected Europe and Asia?",a:["Silk Road","Appian Way","Route 66","Inca Trail"],c:0},
+      {difficulty:"championship",q:"Which landmark is associated with the Maya civilization?",a:["Chichén Itzá","Colosseum","Eiffel Tower","Taj Mahal"],c:0}
+    ],
+    redemptionQuestions: [
+      {difficulty:"medium",q:"Make-Up: Which country contains Petra?",a:["Jordan","Egypt","Peru","Italy"],c:0},
+      {difficulty:"medium",q:"Make-Up: Which continent is Brazil in?",a:["South America","Africa","Europe","Asia"],c:0},
+      {difficulty:"hard",q:"Make-Up: Which civilization used hieroglyphs?",a:["Ancient Egyptians","Romans","Vikings","Mongols"],c:0},
+      {difficulty:"hard",q:"Make-Up: Which canal connects the Mediterranean and Red Sea?",a:["Suez Canal","Panama Canal","Erie Canal","Grand Canal"],c:0},
+      {difficulty:"championship",q:"Make-Up: Which city was formerly Constantinople?",a:["Istanbul","Athens","Rome","Cairo"],c:0},
+      {difficulty:"championship",q:"Make-Up: Which empire controlled large parts of Eurasia at its height?",a:["Mongol Empire","Aztec Empire","Mali Empire","Inca Empire"],c:0}
+    ]
+  },
+
+  "World Quest Tie-Breaker": {
+    prizeEligible: true,
+    type: "choice",
+    questions: [
+      {difficulty:"championship",q:"Which country is both transcontinental and historically linked to Constantinople?",a:["Turkey","Egypt","Spain","India"],c:0},
+      {difficulty:"championship",q:"Which empire connected large portions of Eurasia and helped protect trade along the Silk Road?",a:["Mongol Empire","Roman Empire","Aztec Empire","Mali Empire"],c:0},
+      {difficulty:"championship",q:"Which landmark is directly tied to the ancient Maya civilization?",a:["Chichén Itzá","Taj Mahal","Colosseum","Petra"],c:0},
+      {difficulty:"championship",q:"Which geographic term describes a narrow water passage connecting two larger bodies of water?",a:["Strait","Delta","Plateau","Archipelago"],c:0},
+      {difficulty:"championship",q:"Which civilization is most associated with city-states such as Athens and Sparta?",a:["Ancient Greece","Ancient Egypt","Inca","Mongol"],c:0}
+    ],
+    redemptionQuestions: [
+      {difficulty:"championship",q:"Make-Up: Which ruler is strongly associated with the Mali Empire and a famous pilgrimage?",a:["Mansa Musa","Julius Caesar","Genghis Khan","Cleopatra"],c:0},
+      {difficulty:"championship",q:"Make-Up: Which canal connects the Mediterranean Sea and Red Sea?",a:["Suez Canal","Panama Canal","Erie Canal","Grand Canal"],c:0},
+      {difficulty:"championship",q:"Make-Up: Which flag is the only non-rectangular national flag?",a:["Nepal","Bhutan","Qatar","Maldives"],c:0},
+      {difficulty:"championship",q:"Make-Up: Which ancient trade route connected Europe and Asia?",a:["Silk Road","Route 66","Appian Way","Inca Trail"],c:0},
+      {difficulty:"championship",q:"Make-Up: Which city is historically known as Constantinople?",a:["Istanbul","Athens","Rome","Cairo"],c:0}
     ]
   }
 };
