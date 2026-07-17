@@ -71,8 +71,24 @@ function downloadExcelReport(filename,rows){
   URL.revokeObjectURL(url);
 }
 async function exportLeaderboard(code,outputId){const result=await api("exportLeaderboard",{code});if(!result.ok){if(outputId)$(outputId).textContent=JSON.stringify(result,null,2);else alert(result.message||"Export denied.");return;}downloadExcelReport("mhi_provider_coordinators_leaderboard.xls",result.rows);if(outputId)$(outputId).textContent="Leaderboard exported.";}
-async function adminLogin(){const result=await api("adminVerify",{code:$("adminCode").value});if(result.ok)$("adminPanel").classList.remove("hidden");else alert("Invalid admin code.");}
-async function ownerLogin(){const result=await api("ownerVerify",{code:$("ownerCode").value});if(result.ok)$("ownerPanel").classList.remove("hidden");else alert("Invalid owner code.");}
+async function adminLogin(){
+  const status=$("adminLoginStatus");
+  if(status)status.textContent="Checking admin code...";
+  try{
+    const result=await api("adminVerify",{code:$("adminCode").value.trim()});
+    if(result.ok){$("adminPanel").classList.remove("hidden");if(status)status.textContent="Admin functions unlocked.";}
+    else{if(status)status.textContent=result.message||"Invalid admin code.";alert(result.message||"Invalid admin code.");}
+  }catch(e){if(status)status.textContent="Connection error: "+e.message;alert("Admin login could not connect: "+e.message);}
+}
+async function ownerLogin(){
+  const status=$("ownerLoginStatus");
+  if(status)status.textContent="Checking owner code...";
+  try{
+    const result=await api("ownerVerify",{code:$("ownerCode").value.trim()});
+    if(result.ok){$("ownerPanel").classList.remove("hidden");if(status)status.textContent="Owner functions unlocked.";}
+    else{if(status)status.textContent=result.message||"Invalid owner code.";alert(result.message||"Invalid owner code.");}
+  }catch(e){if(status)status.textContent="Connection error: "+e.message;alert("Owner login could not connect: "+e.message);}
+}
 async function setRelease(role,status){const code=role==="owner"?$("ownerCode").value:$("adminCode").value;const week=role==="owner"?$("ownerWeek").value:$("adminWeek").value;const releaseType=role==="owner"?$("ownerReleaseType").value:$("adminReleaseType").value;const result=await api("setReleaseStatus",{role,code,week,releaseType,status});$(role==="owner"?"ownerOutput":"adminOutput").textContent=JSON.stringify(result,null,2);await loadActiveDefault();}
 async function setWeekGame(role){const code=role==="owner"?$("ownerCode").value:$("adminCode").value;const week=role==="owner"?$("ownerWeek").value:$("adminWeek").value;const game=role==="owner"?$("ownerGameChoice").value:$("adminGameChoice").value;const result=await api("setWeekGame",{role,code,week,game});$(role==="owner"?"ownerOutput":"adminOutput").textContent=JSON.stringify(result,null,2);await loadActiveDefault();}
 async function fairPlayAudit(){const result=await api("fairPlayAudit",{code:$("adminCode").value});$("adminOutput").textContent=JSON.stringify(result,null,2);}
@@ -147,5 +163,47 @@ async function forceCloseAllRounds(){
   const result=await api("forceCloseAllRounds",{code:$("ownerCode").value});$("ownerOutput").textContent=JSON.stringify(result,null,2);await loadActiveDefault();
 }
 
-document.addEventListener("DOMContentLoaded",()=>{$("joinBtn").addEventListener("click",joinGame);$("submitTypedBtn").addEventListener("click",submitTyped);$("nextBtn").style.display="none";$("exitBtn").addEventListener("click",exitToEntry);$("refreshBtn").addEventListener("click",refreshLeaderboard);$("exportBtn").addEventListener("click",()=>exportLeaderboard($("exportCode").value));$("adminLoginBtn").addEventListener("click",adminLogin);$("ownerLoginBtn").addEventListener("click",ownerLogin);$("adminSetGameBtn").addEventListener("click",()=>setWeekGame("admin"));$("ownerSetGameBtn").addEventListener("click",()=>setWeekGame("owner"));$("adminOpenBtn").addEventListener("click",()=>setRelease("admin","Open"));$("adminCloseBtn").addEventListener("click",()=>setRelease("admin","Closed"));$("ownerOpenBtn").addEventListener("click",()=>setRelease("owner","Open"));$("ownerCloseBtn").addEventListener("click",()=>setRelease("owner","Closed"));$("ownerPracticeBtn").addEventListener("click",startOwnerPractice);$("ownerLoadQuestionsBtn").addEventListener("click",loadEditableQuestions);$("ownerSaveQuestionsBtn").addEventListener("click",saveEditableQuestions);$("ownerResetQuestionsBtn").addEventListener("click",clearEditableQuestions);$("adminAuditBtn").addEventListener("click",fairPlayAudit);$("adminExportBtn").addEventListener("click",()=>exportLeaderboard($("adminCode").value,"adminOutput"));$("adminSetupBonusBtn").addEventListener("click",()=>setupBonusPointsSheet("admin"));$("ownerExportBtn").addEventListener("click",()=>exportLeaderboard($("ownerCode").value,"ownerOutput"));$("ownerSetupBonusBtn").addEventListener("click",()=>setupBonusPointsSheet("owner"));$("ownerAdjustBtn").addEventListener("click",ownerAdjust);$("adminRenamePlayerBtn").addEventListener("click",()=>renamePlayer("admin"));$("ownerRenamePlayerBtn").addEventListener("click",()=>renamePlayer("owner"));$("ownerGenerateTempBtn").addEventListener("click",()=>ownerAction("generateTempAdminCode"));$("ownerLogsBtn").addEventListener("click",()=>ownerAction("getActionLogs"));$("ownerSuspiciousBtn").addEventListener("click",()=>ownerAction("getSuspiciousActivity"));$("ownerReportBtn").addEventListener("click",()=>ownerAction("internalSummaryReport"));$("ownerParticipationBtn").addEventListener("click",()=>ownerAction("participationReport"));$("ownerMake-UpBtn").addEventListener("click",()=>ownerAction("make-upReport"));$("ownerPrizeBtn").addEventListener("click",()=>ownerAction("prizePointsReport"));$("ownerAuditBtn").addEventListener("click",()=>ownerAction("deepAuditReport"));$("ownerResetPlayerBtn").addEventListener("click",ownerResetPlayerRound);$("ownerResetLeaderboardBtn").addEventListener("click",ownerArchiveResetLeaderboard);$("ownerDeletePlayerBtn").addEventListener("click",ownerDeletePlayer);if($("adminAuditExportBtn"))$("adminAuditExportBtn").addEventListener("click",()=>exportAuditReport($("adminCode").value,"adminOutput"));if($("adminMakeupReportBtn"))$("adminMakeupReportBtn").addEventListener("click",()=>exportMakeupReport($("adminCode").value,"adminOutput"));if($("ownerActiveDashboardBtn"))$("ownerActiveDashboardBtn").addEventListener("click",activeRoundDashboard);if($("ownerForceCloseBtn"))$("ownerForceCloseBtn").addEventListener("click",forceCloseAllRounds);if($("ownerAuditExportBtn"))$("ownerAuditExportBtn").addEventListener("click",()=>exportAuditReport($("ownerCode").value,"ownerOutput"));if($("ownerBonusReportBtn"))$("ownerBonusReportBtn").addEventListener("click",()=>exportBonusReport($("ownerCode").value,"ownerOutput"));if($("ownerMakeupReportBtn"))$("ownerMakeupReportBtn").addEventListener("click",()=>exportMakeupReport($("ownerCode").value,"ownerOutput"));refreshLeaderboard();loadActiveDefault();});
+document.addEventListener("DOMContentLoaded",()=>{
+  const on=(id,event,handler)=>{const el=$(id);if(el)el.addEventListener(event,handler);};
+  on("joinBtn","click",joinGame);
+  on("submitTypedBtn","click",submitTyped);
+  if($("nextBtn"))$("nextBtn").style.display="none";
+  on("exitBtn","click",exitToEntry);
+  on("refreshBtn","click",refreshLeaderboard);
+  on("exportBtn","click",()=>exportLeaderboard($("exportCode").value));
+  on("adminLoginBtn","click",adminLogin);
+  on("ownerLoginBtn","click",ownerLogin);
+  on("adminSetGameBtn","click",()=>setWeekGame("admin"));
+  on("ownerSetGameBtn","click",()=>setWeekGame("owner"));
+  on("adminOpenBtn","click",()=>setRelease("admin","Open"));
+  on("adminCloseBtn","click",()=>setRelease("admin","Closed"));
+  on("ownerOpenBtn","click",()=>setRelease("owner","Open"));
+  on("ownerCloseBtn","click",()=>setRelease("owner","Closed"));
+  on("ownerPracticeBtn","click",startOwnerPractice);
+  on("ownerLoadQuestionsBtn","click",loadEditableQuestions);
+  on("ownerSaveQuestionsBtn","click",saveEditableQuestions);
+  on("ownerResetQuestionsBtn","click",clearEditableQuestions);
+  on("adminAuditBtn","click",fairPlayAudit);
+  on("adminExportBtn","click",()=>exportLeaderboard($("adminCode").value,"adminOutput"));
+  on("adminSetupBonusBtn","click",()=>setupBonusPointsSheet("admin"));
+  on("ownerExportBtn","click",()=>exportLeaderboard($("ownerCode").value,"ownerOutput"));
+  on("ownerSetupBonusBtn","click",()=>setupBonusPointsSheet("owner"));
+  on("adminRenamePlayerBtn","click",()=>renamePlayer("admin"));
+  on("ownerRenamePlayerBtn","click",()=>renamePlayer("owner"));
+  on("ownerAdjustBtn","click",ownerAdjust);
+  on("ownerReportBtn","click",()=>ownerAction("internalSummaryReport"));
+  on("ownerParticipationBtn","click",()=>ownerAction("participationReport"));
+  on("ownerMake-UpBtn","click",()=>ownerAction("redemptionReport"));
+  on("ownerPrizeBtn","click",()=>ownerAction("prizePointsReport"));
+  on("ownerAuditBtn","click",()=>ownerAction("deepAuditReport"));
+  on("ownerActiveDashboardBtn","click",activeRoundDashboard);
+  on("ownerForceCloseBtn","click",forceCloseAllRounds);
+  on("ownerAuditExportBtn","click",()=>exportAuditReport($("ownerCode").value,"ownerOutput"));
+  on("ownerBonusReportBtn","click",()=>exportBonusReport($("ownerCode").value,"ownerOutput"));
+  on("ownerMakeupReportBtn","click",()=>exportMakeupReport($("ownerCode").value,"ownerOutput"));
+  on("adminAuditExportBtn","click",()=>exportAuditReport($("adminCode").value,"adminOutput"));
+  on("adminMakeupReportBtn","click",()=>exportMakeupReport($("adminCode").value,"adminOutput"));
+  refreshLeaderboard();
+  loadActiveDefault();
+});
 })();
