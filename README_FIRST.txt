@@ -1,28 +1,41 @@
-MHI WORLD QUEST v32 — SINGLE APPS SCRIPT RELEASE
+MHI WORLD QUEST — SIMPLE ALL-IN-ONE VERSION 36
 
-This version removes GitHub/config.js entirely. The webpage and backend live in the SAME Apps Script deployment, so the portal cannot point to an older backend URL.
+DO NOT USE THE OLD GITHUB WEBSITE WITH THIS VERSION.
+Everything runs from one Google Apps Script deployment, so the website and buttons cannot point to different backends.
 
-ADD THESE 5 FILES TO ONE GOOGLE APPS SCRIPT PROJECT ATTACHED TO THE GAME SPREADSHEET:
-1. Code.gs              (Script file)
-2. Index.html           (HTML file)
-3. Style.html           (HTML file)
-4. GameBankJS.html      (HTML file)
-5. GameJS.html          (HTML file)
+SETUP
+1. Open the Google Sheet used for the game.
+2. Click Extensions > Apps Script.
+3. Delete the old Code.gs contents.
+4. Paste the complete contents of Code.gs from this package.
+5. Create four HTML files using the + button:
+   - Index
+   - Style
+   - GameBankJS
+   - GameJS
+6. Paste the matching file contents into each one.
+7. Click Save.
+8. Click Deploy > New deployment > Web app.
+9. Execute as: Me.
+10. Choose the access level your staff need.
+11. Click Deploy and use the NEW /exec URL as the website.
 
-IMPORTANT:
-- Delete or replace the old Code.gs content.
-- File names must match exactly, including capitalization.
-- Deploy as Web app.
-- Execute as: Me
-- Who has access: Anyone (or your organization, if all players are signed in)
-- Open the NEW web app /exec URL. This version does not use the GitHub Pages URL.
+IMPORTANT
+- Stop using the old GitHub Pages address.
+- The new Apps Script /exec URL is the full game website.
+- The script automatically creates missing spreadsheet tabs.
+- Owner code: MHI-OWNER-MARIO-TV-2026
+- Admin code: MHI-ADMIN-FRIDAY-2026
 
-BUTTON ACTIONS ROUTED DIRECTLY IN THIS RELEASE:
-- Close Round -> setReleaseStatus
-- Clear Custom Questions -> clearCustomQuestions
-- Force Close All Rounds -> forceCloseAllRounds
-- Reset Player Round -> ownerResetPlayerRound
-- Archive + Reset Leaderboard -> ownerArchiveResetLeaderboard
-- Delete Player Completely -> ownerDeletePlayer
+BUTTONS INCLUDED
+- Set Week Game
+- Open Round
+- Close Round
+- Clear Custom Questions
+- Force Close All Rounds
+- Reset Player Round
+- Archive + Reset Leaderboard
+- Delete Player Completely
 
-Backend version: 32.0-single-appscript
+EXPECTED CONNECTION MESSAGE
+Connected to Apps Script version 36.0-SIMPLE-ALL-IN-ONE.

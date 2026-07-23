@@ -91,15 +91,17 @@ async function ownerLogin(){
   }catch(e){if(status)status.textContent="Connection error: "+e.message;alert("Owner login could not connect: "+e.message);}
 }
 async function verifyBackendVersion(outputId){
-  const result=await api("backendVersion",{});
   const output=$(outputId);
-  if(!result.ok||false){
-    const msg="Connected to Apps Script version "+String(result.version||"unknown")+".";
-    if(output)output.textContent=msg+" Current backend response: "+JSON.stringify(result);
+  try{
+    const result=await api("backendVersion",{});
+    const version=result.backendVersion||result.version||result.apiVersion||"unknown";
+    const msg="Connected to Apps Script version "+version+".";
     if(output)output.textContent=msg;
-    return true;
+    return result.ok===true;
+  }catch(e){
+    if(output)output.textContent="Apps Script connection failed: "+e.message;
+    return false;
   }
-  return true;
 }
 async function runPortalAction(role, actionName, payload){
   const output=$(role==="owner"?"ownerOutput":"adminOutput");

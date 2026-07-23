@@ -2,7 +2,7 @@ const ADMIN_CODE="MHI-ADMIN-FRIDAY-2026";
 const OWNER_CODE="MHI-OWNER-MARIO-TV-2026";
 const TEMP_ADMIN_MINUTES=60;
 const SHEETS={SETTINGS:"Settings",PLAYERS:"Players",PLAYS:"Plays",ADJUSTMENTS:"Adjustments",ACTION_LOGS:"Action Logs",TEMP_CODES:"Temporary Admin Codes",SUSPICIOUS:"Suspicious Activity",FUN_SCORES:"Fun Scores",CORRECTIONS:"Name Corrections",BONUS_POINTS:"External Bonus Points",CUSTOM_QUESTIONS:"Custom Questions"};
-const BACKEND_VERSION="32.0-single-appscript";
+const BACKEND_VERSION="36.0-SIMPLE-ALL-IN-ONE";
 function normalizeActionName(value){
   const raw=String(value||"").trim();
   const compact=raw.toLowerCase().replace(/[^a-z0-9]/g,"");
@@ -35,9 +35,10 @@ function doGet(){
 function include(filename){return HtmlService.createHtmlOutputFromFile(filename).getContent();}
 function apiGateway(action,payload){
   try{
+    ensureCoreSheets_();
     const data=Object.assign({},payload||{}, {action:action});
-    return routeAction(data,null);
-  }catch(err){return {ok:false,message:String(err),version:BACKEND_VERSION};}
+    return withVersion_(routeAction(data,null));
+  }catch(err){return withVersion_({ok:false,message:String(err)});}
 }
 function doPost(e){try{
   let data={};
@@ -48,7 +49,7 @@ function doPost(e){try{
 function routeAction(data,e){
   const a=normalizeActionName(data.action);
   data.action=a;
-  if(a==="backendVersion")return {ok:true,version:BACKEND_VERSION};
+  if(a==="backendVersion")return withVersion_({ok:true,message:"Connected"});
   if(a==="joinGame")return joinGame(data,e);
   if(a==="saveProgress")return saveProgress(data,e);
   if(a==="submitScore")return submitScore(data,e);
@@ -86,10 +87,26 @@ function routeAction(data,e){
   if(a==="makeupEligibilityReport")return makeupEligibilityReport(data);
   if(a==="activeRoundDashboard")return activeRoundDashboard(data);
   if(a==="forceCloseAllRounds")return forceCloseAllRounds(data,e);
-  return {ok:false,message:"Unknown action: "+String(data.action||"(blank)"),version:BACKEND_VERSION};
+  return withVersion_({ok:false,message:"Unknown action received: "+String(data.action||"(blank)")+". This page and backend should both be version "+BACKEND_VERSION+"."});
 }
-function json(o){return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);}
-function ss(){return SpreadsheetApp.getActiveSpreadsheet();}function sheet(n){return ss().getSheetByName(n);}function now(){return new Date();}function norm(n){return String(n||"").trim().replace(/\s+/g," ").toLowerCase();}function nice(n){return String(n||"").trim().replace(/\s+/g," ");}function uuid(){return Utilities.getUuid();}
+function json(o){return ContentService.createTextOutput(JSON.stringify(withVersion_(o))).setMimeType(ContentService.MimeType.JSON);}
+function withVersion_(o){const r=(o&&typeof o==="object")?o:{ok:false,message:String(o)};r.version=BACKEND_VERSION;r.backendVersion=BACKEND_VERSION;r.apiVersion=BACKEND_VERSION;return r;}
+function ss(){const book=SpreadsheetApp.getActiveSpreadsheet();if(!book)throw new Error("This Apps Script must be opened from the Google Sheet used by the game. Open the spreadsheet, then Extensions > Apps Script.");return book;}
+function ensureSheet_(name,headers){let sh=ss().getSheetByName(name);if(!sh){sh=ss().insertSheet(name);}if(sh.getLastRow()===0&&headers&&headers.length){sh.appendRow(headers);}return sh;}
+function ensureCoreSheets_(){
+ ensureSheet_(SHEETS.SETTINGS,["Setting","Value","Notes"]);
+ ensureSheet_(SHEETS.PLAYERS,["Name","Normalized Name","Created At","Notes","Status"]);
+ ensureSheet_(SHEETS.PLAYS,["Play ID","Name","Normalized Name","Week","Game","Started At","Completed At","Score","Correct","Answered","Minutes","Status","Fair Play","Round Type","Prize Eligible","Reserved","Question Index","Saved Score","Saved Correct"]);
+ ensureSheet_(SHEETS.ADJUSTMENTS,["Date","Name","Normalized Name","Points","Reason","Added By"]);
+ ensureSheet_(SHEETS.ACTION_LOGS,["Date","Role","Action","Details","Notes"]);
+ ensureSheet_(SHEETS.TEMP_CODES,["Code","Created At","Expires At","Status"]);
+ ensureSheet_(SHEETS.SUSPICIOUS,["Date","Name","Normalized Name","Issue","Details"]);
+ ensureSheet_(SHEETS.FUN_SCORES,["Timestamp","Name","Normalized Name","Game","Score","Date"]);
+ ensureSheet_(SHEETS.CORRECTIONS,["Timestamp","Old Name","Old Normalized Name","Corrected Name","Corrected Normalized Name","Changed By","Status"]);
+ ensureSheet_(SHEETS.BONUS_POINTS,["Date","Name","Normalized Name","Week","Bonus Type","Points","Reason","Added By","Notes"]);
+ ensureSheet_(SHEETS.CUSTOM_QUESTIONS,["Key","Week","Round","Game","Questions JSON","Updated At","Updated By","Status"]);
+}
+function sheet(n){ensureCoreSheets_();return ss().getSheetByName(n);}function now(){return new Date();}function norm(n){return String(n||"").trim().replace(/\s+/g," ").toLowerCase();}function nice(n){return String(n||"").trim().replace(/\s+/g," ");}function uuid(){return Utilities.getUuid();}
 function isOwner(c){return String(c||"")===OWNER_CODE;}function isAdmin(c){return String(c||"")===ADMIN_CODE||isTempAdmin(c);}function canExport(c){return isAdmin(c)||isOwner(c);}function boolValue(v){return v===true||v==="TRUE"||v==="true";}
 function isTempAdmin(c){const sh=sheet(SHEETS.TEMP_CODES);const values=sh.getDataRange().getValues();const current=now();for(let i=1;i<values.length;i++){if(values[i][0]===String(c||"")&&values[i][3]==="Active"&&new Date(values[i][2])>=current)return true;}return false;}
 function logAction(role,action,details,e){sheet(SHEETS.ACTION_LOGS).appendRow([now(),role,action,JSON.stringify(details||{}),""]);}function logSuspicious(name,issue,details){sheet(SHEETS.SUSPICIOUS).appendRow([now(),nice(name),norm(name),issue,JSON.stringify(details||{})]);}
