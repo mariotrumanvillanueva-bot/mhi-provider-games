@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MHI World Quest Mini Games</title>
+  <link rel="stylesheet" href="style.css?v=40.0" />
+</head>
+<body>
+  <header>
+    <h1>🌎 MHI World Quest</h1>
+    <p class="subtitle">Provider Coordinator Friday Mini Games</p>
+    <div id="connectionStatus" class="status-bar">Connecting to Apps Script...</div>
+  </header>
+
+  <main>
+    <section class="grid">
+      <div class="card">
+        <h2>Player Game</h2>
+        <label for="playerName">Your name</label>
+        <input id="playerName" placeholder="Enter your name" />
+        <div class="row">
+          <button id="loadGameBtn">Load Active Game</button>
+          <button id="refreshLeaderboardBtn" class="secondary">Refresh Leaderboard</button>
+        </div>
+        <div id="playerMessage" class="message"></div>
+      </div>
+
+      <div class="card">
+        <h2>Leaderboard</h2>
+        <table class="leaderboard">
+          <thead><tr><th>Rank</th><th>Name</th><th>Score</th><th>Week</th></tr></thead>
+          <tbody id="leaderboardBody"><tr><td colspan="4">No scores loaded yet.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="gameCard" class="card hidden">
+      <h2 id="gameTitle">Game</h2>
+      <div id="progressText" class="notice"></div>
+      <div id="questionText" class="question"></div>
+      <div id="choicesWrap"></div>
+      <div id="scoreText" class="message"></div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Admin Portal</h2>
+        <label for="adminPin">Admin PIN</label>
+        <input id="adminPin" type="password" placeholder="Admin PIN" />
+        <button id="adminLoginBtn">Admin Login</button>
+        <div id="adminMessage" class="message"></div>
+
+        <div id="adminPanel" class="admin-panel hidden">
+          <h3>Round Controls</h3>
+          <label for="weekSelect">Week</label>
+          <select id="weekSelect">
+            <option value="week1">Week 1</option>
+            <option value="week2">Week 2</option>
+            <option value="week3">Week 3</option>
+            <option value="week4">Week 4</option>
+          </select>
+          <label for="roundType">Round Type</label>
+          <select id="roundType">
+            <option value="main">Main Round</option>
+            <option value="redemption">Make-Up / Redemption Round</option>
+            <option value="final">Final Tournament</option>
+          </select>
+          <button id="setWeekGameBtn">Set Week Game</button>
+          <button id="openRoundBtn" class="good">Open Round</button>
+          <button id="closeRoundBtn" class="danger">Close Round</button>
+          <button id="clearCustomQuestionsBtn" class="secondary">Clear Custom Questions</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Owner Portal</h2>
+        <label for="ownerPin">Owner PIN</label>
+        <input id="ownerPin" type="password" placeholder="Owner PIN" />
+        <button id="ownerLoginBtn">Owner Login</button>
+        <div id="ownerMessage" class="message"></div>
+
+        <div id="ownerPanel" class="admin-panel hidden">
+          <h3>Owner Controls</h3>
+          <button id="forceCloseAllRoundsBtn" class="danger">Force Close All Rounds</button>
+          <label for="resetPlayerName">Player name for reset/delete</label>
+          <input id="resetPlayerName" placeholder="Exact player name" />
+          <button id="resetPlayerRoundBtn" class="secondary">Reset Player Round</button>
+          <button id="deletePlayerCompletelyBtn" class="danger">Delete Player Completely</button>
+          <button id="archiveResetLeaderboardBtn" class="danger">Archive + Reset Leaderboard</button>
+          <p class="small">Archive + Reset moves active scores into the Leaderboard Archive sheet before clearing active scores.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js?v=40.0"></script>
+  <script src="gameBank.js?v=40.0"></script>
+  <script src="game.js?v=40.0"></script>
+</body>
+</html>
