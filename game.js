@@ -24,7 +24,7 @@
   function apiUrl() {
     const url = window.MHI_CONFIG && window.MHI_CONFIG.API_URL;
     if (!url || url.includes("PASTE_YOUR")) {
-      throw new Error("https://script.google.com/macros/s/AKfycbyiggaUohJy-uut3N-M4UPGzNBaB2ARgIkGP4hHPOL7yti1msqRlPWgoOMKXvJJ8A5X/exec");
+      throw new Error("https://script.google.com/macros/s/AKfycby58uN2dk_Nl6kpsWG6pb-QrVRAKPWw9sfMceJjxcPxpPQqq_FZx7i1UEF9oQQYszNyGA/exec");
     }
     return url;
   }
