@@ -4,5 +4,5 @@
   STEP 2: Paste your Web App /exec URL below.
 */
 const MHI_CONFIG = {
-  API_URL: "https://script.google.com/macros/library/d/1VyzfZKPIwd45tL_NUUteExoF230U2Ur7WkPc6lUr0VQjlSCKjYXbXaE5/16"
+  API_URL: "https://script.google.com/macros/s/AKfycbxr-K44uUgTsP3IgDArgknk0ryIxTy5H6aas3x4qKT0zH9Igy4sf_-QcG7iqm9J2Sl62g/exec"
 };
