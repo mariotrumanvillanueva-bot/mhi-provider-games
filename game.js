@@ -24,7 +24,7 @@
   function apiUrl() {
     const url = window.MHI_CONFIG && window.MHI_CONFIG.API_URL;
     if (!url || url.includes("PASTE_YOUR")) {
-      throw new Error("Paste your Apps Script /exec URL into config.js first.");
+      throw new Error("https://script.google.com/macros/s/AKfycbyiggaUohJy-uut3N-M4UPGzNBaB2ARgIkGP4hHPOL7yti1msqRlPWgoOMKXvJJ8A5X/exec");
     }
     return url;
   }
