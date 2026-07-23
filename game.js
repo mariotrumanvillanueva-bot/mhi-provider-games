@@ -1,8 +1,8 @@
-/* MHI World Quest v41.1 - Status Ready Fix */
+/* MHI World Quest v40 - Fresh GitHub frontend */
 (function () {
   "use strict";
 
-  const APP_VERSION = "41.1-STATUS-READY-FIX";
+  const APP_VERSION = "40.0-FROM-SCRATCH";
   let currentGame = null;
   let currentQuestionIndex = 0;
   let currentScore = 0;
@@ -22,33 +22,23 @@
   }
 
   function apiUrl() {
-    return "https://script.google.com/macros/s/AKfycbxr-K44uUgTsP3IgDArgknk0ryIxTy5H6aas3x4qKT0zH9Igy4sf_-QcG7iqm9J2Sl62g/exec";
+    const url = window.MHI_CONFIG && window.MHI_CONFIG.API_URL;
+    if (!url || url.includes("PASTE_YOUR")) {
+      throw new Error("Paste your Apps Script /exec URL into config.js first.");
+    }
+    return url;
   }
 
+  // JSONP keeps GitHub Pages and Apps Script from fighting CORS.
   function api(action, data = {}) {
     return new Promise((resolve, reject) => {
-      const callbackName =
-        "mhi_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000000);
-
+      const callbackName = "mhi_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000000);
       const payload = encodeURIComponent(JSON.stringify({ action, ...data }));
-      const src =
-        apiUrl() +
-        "?callback=" +
-        callbackName +
-        "&payload=" +
-        payload +
-        "&t=" +
-        Date.now();
-
+      const src = apiUrl() + "?callback=" + callbackName + "&payload=" + payload + "&t=" + Date.now();
       const script = document.createElement("script");
-
       const timer = setTimeout(() => {
         cleanup();
-        reject(
-          new Error(
-            "Apps Script did not respond. Check the /exec URL and deployment permissions."
-          )
-        );
+        reject(new Error("Apps Script did not respond. Check the /exec URL and deployment permissions."));
       }, 20000);
 
       function cleanup() {
@@ -59,90 +49,28 @@
 
       window[callbackName] = (response) => {
         cleanup();
-
-        if (!response) {
-          reject(new Error("No response from Apps Script."));
-          return;
+        if (!response || response.ok === false) {
+          reject(new Error((response && response.message) || "Request failed."));
+        } else {
+          resolve(response);
         }
-
-        if (response.ok === false) {
-          reject(new Error(response.message || "Request failed."));
-          return;
-        }
-
-        resolve(response);
       };
 
       script.onerror = () => {
         cleanup();
-        reject(
-          new Error(
-            "Could not load Apps Script response. Make sure deployment access is allowed."
-          )
-        );
+        reject(new Error("Could not load Apps Script response. Make sure deployment access is allowed."));
       };
-
       script.src = src;
       document.body.appendChild(script);
     });
   }
 
   async function checkConnection() {
-    const statusEl = $("connectionStatus");
-
     try {
-      let res;
-
-      try {
-        res = await api("health");
-      } catch (healthErr) {
-        res = await api("status");
-      }
-
-      const scriptStatus =
-        res.version ||
-        res.backendVersion ||
-        res.apiVersion ||
-        res.status ||
-        "ready";
-
-      if (
-        res.status === "ready" ||
-        res.status === "ok" ||
-        res.ready === true ||
-        res.version ||
-        res.backendVersion ||
-        res.apiVersion
-      ) {
-        if (statusEl) {
-          statusEl.textContent =
-            "Connected to Apps Script. Status " +
-            scriptStatus +
-            ". Website v" +
-            APP_VERSION +
-            ".";
-          statusEl.className = "status good";
-        }
-        return true;
-      }
-
-      if (statusEl) {
-        statusEl.textContent =
-          "Connected to Apps Script. Response received. Website v" +
-          APP_VERSION +
-          ".";
-        statusEl.className = "status good";
-      }
-
-      return true;
+      const res = await api("health");
+      setText("connectionStatus", "Connected to Apps Script version " + (res.version || "unknown") + ". Website v" + APP_VERSION + ".");
     } catch (err) {
-      if (statusEl) {
-        statusEl.textContent = "Not connected: " + apiUrl();
-        statusEl.className = "status bad";
-      }
-
-      console.error("Connection error:", err);
-      return false;
+      setText("connectionStatus", "Not connected: " + err.message);
     }
   }
 
@@ -151,74 +79,40 @@
       const res = await api("getLeaderboard");
       const rows = res.leaderboard || [];
       const body = $("leaderboardBody");
-
-      if (!body) return;
-
       if (!rows.length) {
         body.innerHTML = '<tr><td colspan="4">No scores yet.</td></tr>';
         return;
       }
-
-      body.innerHTML = rows
-        .map(
-          (r, i) =>
-            `<tr>
-              <td>${i + 1}</td>
-              <td>${escapeHtml(r.name)}</td>
-              <td>${escapeHtml(r.score)}</td>
-              <td>${escapeHtml(r.week || "")}</td>
-            </tr>`
-        )
-        .join("");
+      body.innerHTML = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.name)}</td><td>${r.score}</td><td>${escapeHtml(r.week || "")}</td></tr>`).join("");
     } catch (err) {
       setText("playerMessage", err.message);
     }
   }
 
   function escapeHtml(value) {
-    return String(value == null ? "" : value).replace(
-      /[&<>'"]/g,
-      (ch) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          "'": "&#39;",
-          '"': "&quot;"
-        }[ch])
-    );
+    return String(value == null ? "" : value).replace(/[&<>'"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch]));
   }
 
   async function loadActiveGame() {
-    const nameEl = $("playerName");
-    const name = nameEl ? nameEl.value.trim() : "";
-
+    const name = $("playerName").value.trim();
     if (!name) {
       setText("playerMessage", "Enter your name first.");
       return;
     }
-
     try {
       const settings = await api("getSettings");
-
       if (!settings.roundOpen) {
         setText("playerMessage", "The round is currently closed.");
         return;
       }
-
       selectedWeek = settings.activeWeek || "week1";
       selectedRoundType = settings.roundType || "main";
-
-      currentGame =
-        GAME_BANK.weeks[selectedWeek] || GAME_BANK.weeks.week1;
-
+      currentGame = GAME_BANK.weeks[selectedWeek] || GAME_BANK.weeks.week1;
       currentQuestionIndex = 0;
       currentScore = 0;
-
       show("gameCard", true);
       setText("gameTitle", currentGame.title + " - " + selectedRoundType);
       setText("playerMessage", "Game loaded. Good luck!");
-
       renderQuestion();
     } catch (err) {
       setText("playerMessage", err.message);
@@ -227,67 +121,40 @@
 
   function renderQuestion() {
     if (!currentGame) return;
-
     const questions = currentGame.questions || [];
-
     if (currentQuestionIndex >= questions.length) {
       finishGame();
       return;
     }
-
     const item = questions[currentQuestionIndex];
-
-    setText(
-      "progressText",
-      `Question ${currentQuestionIndex + 1} of ${questions.length}`
-    );
+    setText("progressText", `Question ${currentQuestionIndex + 1} of ${questions.length}`);
     setText("questionText", item.q);
-
     const wrap = $("choicesWrap");
-    if (!wrap) return;
-
     wrap.innerHTML = "";
-
     item.choices.forEach((choice) => {
       const btn = document.createElement("button");
       btn.className = "choice";
-      btn.type = "button";
       btn.textContent = choice;
       btn.addEventListener("click", () => chooseAnswer(choice));
       wrap.appendChild(btn);
     });
-
     setText("scoreText", "Current score: " + currentScore);
   }
 
   function chooseAnswer(choice) {
     const item = currentGame.questions[currentQuestionIndex];
-
     if (choice === item.answer) currentScore += 10;
-
     currentQuestionIndex += 1;
     renderQuestion();
   }
 
   async function finishGame() {
-    const nameEl = $("playerName");
-    const name = nameEl ? nameEl.value.trim() : "";
-
+    const name = $("playerName").value.trim();
     setText("questionText", "Game complete!");
-
-    const choicesWrap = $("choicesWrap");
-    if (choicesWrap) choicesWrap.innerHTML = "";
-
+    $("choicesWrap").innerHTML = "";
     setText("progressText", "Final score: " + currentScore);
-
     try {
-      await api("submitScore", {
-        name,
-        score: currentScore,
-        week: selectedWeek,
-        roundType: selectedRoundType
-      });
-
+      await api("submitScore", { name, score: currentScore, week: selectedWeek, roundType: selectedRoundType });
       setText("scoreText", "Score submitted.");
       await refreshLeaderboard();
     } catch (err) {
@@ -297,9 +164,7 @@
 
   async function adminLogin() {
     try {
-      const pinEl = $("adminPin");
-      await api("adminLogin", { pin: pinEl ? pinEl.value : "" });
-
+      await api("adminLogin", { pin: $("adminPin").value });
       show("adminPanel", true);
       setText("adminMessage", "Admin unlocked.");
     } catch (err) {
@@ -309,9 +174,7 @@
 
   async function ownerLogin() {
     try {
-      const pinEl = $("ownerPin");
-      await api("ownerLogin", { pin: pinEl ? pinEl.value : "" });
-
+      await api("ownerLogin", { pin: $("ownerPin").value });
       show("ownerPanel", true);
       setText("ownerMessage", "Owner unlocked.");
     } catch (err) {
@@ -321,18 +184,12 @@
 
   async function runAdminAction(action, messageTarget, extra = {}) {
     try {
-      const adminPin = $("adminPin") ? $("adminPin").value : "";
-      const ownerPin = $("ownerPin") ? $("ownerPin").value : "";
-      const week = $("weekSelect") ? $("weekSelect").value : "week1";
-      const roundType = $("roundType") ? $("roundType").value : "main";
-
       const res = await api(action, {
-        pin: adminPin || ownerPin,
-        week,
-        roundType,
+        pin: $("adminPin").value || $("ownerPin").value,
+        week: $("weekSelect").value,
+        roundType: $("roundType").value,
         ...extra
       });
-
       setText(messageTarget, res.message || "Done.");
       await checkConnection();
       await refreshLeaderboard();
@@ -352,46 +209,16 @@
     bind("adminLoginBtn", adminLogin);
     bind("ownerLoginBtn", ownerLogin);
 
-    bind("setWeekGameBtn", () =>
-      runAdminAction("setWeekGame", "adminMessage")
-    );
+    bind("setWeekGameBtn", () => runAdminAction("setWeekGame", "adminMessage"));
+    bind("openRoundBtn", () => runAdminAction("openRound", "adminMessage"));
+    bind("closeRoundBtn", () => runAdminAction("closeRound", "adminMessage"));
+    bind("clearCustomQuestionsBtn", () => runAdminAction("clearCustomQuestions", "adminMessage"));
 
-    bind("openRoundBtn", () =>
-      runAdminAction("openRound", "adminMessage")
-    );
-
-    bind("closeRoundBtn", () =>
-      runAdminAction("closeRound", "adminMessage")
-    );
-
-    bind("clearCustomQuestionsBtn", () =>
-      runAdminAction("clearCustomQuestions", "adminMessage")
-    );
-
-    bind("forceCloseAllRoundsBtn", () =>
-      runAdminAction("forceCloseAllRounds", "ownerMessage")
-    );
-
-    bind("resetPlayerRoundBtn", () => {
-      const name = $("resetPlayerName")
-        ? $("resetPlayerName").value.trim()
-        : "";
-
-      runAdminAction("resetPlayerRound", "ownerMessage", { name });
-    });
-
-    bind("deletePlayerCompletelyBtn", () => {
-      const name = $("resetPlayerName")
-        ? $("resetPlayerName").value.trim()
-        : "";
-
-      runAdminAction("deletePlayerCompletely", "ownerMessage", { name });
-    });
-
+    bind("forceCloseAllRoundsBtn", () => runAdminAction("forceCloseAllRounds", "ownerMessage"));
+    bind("resetPlayerRoundBtn", () => runAdminAction("resetPlayerRound", "ownerMessage", { name: $("resetPlayerName").value.trim() }));
+    bind("deletePlayerCompletelyBtn", () => runAdminAction("deletePlayerCompletely", "ownerMessage", { name: $("resetPlayerName").value.trim() }));
     bind("archiveResetLeaderboardBtn", () => {
-      if (confirm("Archive active scores and reset the leaderboard?")) {
-        runAdminAction("archiveResetLeaderboard", "ownerMessage");
-      }
+      if (confirm("Archive active scores and reset the leaderboard?")) runAdminAction("archiveResetLeaderboard", "ownerMessage");
     });
 
     checkConnection();
