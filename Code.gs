@@ -2,7 +2,7 @@ const ADMIN_CODE="MHI-ADMIN-FRIDAY-2026";
 const OWNER_CODE="MHI-OWNER-MARIO-TV-2026";
 const TEMP_ADMIN_MINUTES=60;
 const SHEETS={SETTINGS:"Settings",PLAYERS:"Players",PLAYS:"Plays",ADJUSTMENTS:"Adjustments",ACTION_LOGS:"Action Logs",TEMP_CODES:"Temporary Admin Codes",SUSPICIOUS:"Suspicious Activity",FUN_SCORES:"Fun Scores",CORRECTIONS:"Name Corrections",BONUS_POINTS:"External Bonus Points",CUSTOM_QUESTIONS:"Custom Questions"};
-const BACKEND_VERSION="36.0-SIMPLE-ALL-IN-ONE";
+const BACKEND_VERSION="37.0-DIRECT-BUTTON-FIX";
 function normalizeActionName(value){
   const raw=String(value||"").trim();
   const compact=raw.toLowerCase().replace(/[^a-z0-9]/g,"");
@@ -27,6 +27,40 @@ function normalizeActionName(value){
   };
   return aliases[compact]||raw;
 }
+
+// DIRECT BUTTON ENDPOINTS
+// These six functions bypass the shared action router completely so the
+// corresponding portal buttons can never return "Unknown action".
+function portalBackendVersion(){
+  return withVersion_({ok:true,message:"Connected"});
+}
+function portalCloseRound(payload){
+  try{
+    const d=Object.assign({},payload||{}, {status:"Closed"});
+    return withVersion_(setReleaseStatus(d,null));
+  }catch(err){return withVersion_({ok:false,message:String(err)});}
+}
+function portalClearCustomQuestions(payload){
+  try{return withVersion_(clearCustomQuestions(payload||{},null));}
+  catch(err){return withVersion_({ok:false,message:String(err)});}
+}
+function portalForceCloseAllRounds(payload){
+  try{return withVersion_(forceCloseAllRounds(payload||{},null));}
+  catch(err){return withVersion_({ok:false,message:String(err)});}
+}
+function portalResetPlayerRound(payload){
+  try{return withVersion_(ownerResetPlayerRound(payload||{},null));}
+  catch(err){return withVersion_({ok:false,message:String(err)});}
+}
+function portalArchiveResetLeaderboard(payload){
+  try{return withVersion_(ownerArchiveResetLeaderboard(payload||{},null));}
+  catch(err){return withVersion_({ok:false,message:String(err)});}
+}
+function portalDeletePlayerCompletely(payload){
+  try{return withVersion_(ownerDeletePlayer(payload||{},null));}
+  catch(err){return withVersion_({ok:false,message:String(err)});}
+}
+
 function doGet(){
   return HtmlService.createTemplateFromFile("Index").evaluate()
     .setTitle("MHI Provider Coordinator Monthly Mini Games")

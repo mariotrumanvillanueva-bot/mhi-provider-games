@@ -15,6 +15,7 @@ function pointsForCompletion(){
 }
 
 async function api(action,payload={}){return await new Promise((resolve,reject)=>{if(!(window.google&&google.script&&google.script.run)){reject(new Error("This page must be opened from the deployed Apps Script web app."));return;}google.script.run.withSuccessHandler(resolve).withFailureHandler(err=>reject(new Error((err&&err.message)||String(err)))).apiGateway(action,payload);});}
+async function directApi(method,payload={}){return await new Promise((resolve,reject)=>{if(!(window.google&&google.script&&google.script.run)){reject(new Error("This page must be opened from the deployed Apps Script web app."));return;}const runner=google.script.run.withSuccessHandler(resolve).withFailureHandler(err=>reject(new Error((err&&err.message)||String(err))));if(typeof runner[method]!=="function"){reject(new Error("Direct Apps Script function is missing: "+method));return;}runner[method](payload);});}
 async function getQuestionsForPlay(gameName,week,releaseType){const gameDef=GAME_BANK[gameName];let questions=filterQuestionsForWeek(gameDef,week,releaseType==="redemption");try{const custom=await api("getCustomQuestions",{game:gameName,week,releaseType});if(custom.ok&&custom.questions&&custom.questions.length){questions=custom.questions;}}catch(e){}return questions;}
 async function joinGame(){const name=$("playerName").value.trim().replace(/\s+/g," ");const week=$("weekSelect").value;const round=$("roundSelect").value;if(!name)return alert("Enter your name first.");try{let result=await api("joinGame",{name,week,releaseType:round});if(result.requiresConfirmation || result.similarNameWarning){
   const proceed=confirm(result.message||"A similar name is already being used. Continue?");
@@ -93,7 +94,7 @@ async function ownerLogin(){
 async function verifyBackendVersion(outputId){
   const output=$(outputId);
   try{
-    const result=await api("backendVersion",{});
+    const result=await directApi("portalBackendVersion",{});
     const version=result.backendVersion||result.version||result.apiVersion||"unknown";
     const msg="Connected to Apps Script version "+version+".";
     if(output)output.textContent=msg;
@@ -121,8 +122,14 @@ async function setRelease(role,status){
   const code=role==="owner"?$("ownerCode").value.trim():$("adminCode").value.trim();
   const week=role==="owner"?$("ownerWeek").value:$("adminWeek").value;
   const releaseType=role==="owner"?$("ownerReleaseType").value:$("adminReleaseType").value;
-  const result=await runPortalAction(role,"setReleaseStatus",{role,code,week,releaseType,status});
-  if(result.ok){await loadActiveDefault();alert(result.message||"Game setting saved.");}
+  const payload={role,code,week,releaseType,status};
+  const result=status==="Closed"
+    ? await directApi("portalCloseRound",payload)
+    : await runPortalAction(role,"setReleaseStatus",payload);
+  const output=$(role==="owner"?"ownerOutput":"adminOutput");
+  if(status==="Closed"&&output)output.textContent=JSON.stringify(result,null,2);
+  if(!result.ok){alert(result.message||"The action could not be completed.");return;}
+  await loadActiveDefault();alert(result.message||"Game setting saved.");
 }
 async function setWeekGame(role){
   const code=role==="owner"?$("ownerCode").value.trim():$("adminCode").value.trim();
@@ -137,9 +144,9 @@ async function ownerAdjust(){const result=await runPortalAction("owner","ownerAd
 async function ownerAction(action){return await runPortalAction("owner",action,{code:$("ownerCode").value.trim()});}
 async function setupBonusPointsSheet(role){const code=role==="owner"?$("ownerCode").value:$("adminCode").value;const result=await api("setupBonusPointsSheet",{code});$(role==="owner"?"ownerOutput":"adminOutput").textContent=JSON.stringify(result,null,2);await refreshLeaderboard();}
 async function renamePlayer(role){const code=role==="owner"?$("ownerCode").value:$("adminCode").value;const oldName=role==="owner"?$("ownerOldName").value:$("adminOldName").value;const newName=role==="owner"?$("ownerNewName").value:$("adminNewName").value;const result=await api("renamePlayerTypo",{role,code,oldName,newName});$(role==="owner"?"ownerOutput":"adminOutput").textContent=JSON.stringify(result,null,2);await refreshLeaderboard();}
-async function ownerResetPlayerRound(){const result=await runPortalAction("owner","ownerResetPlayerRound",{code:$("ownerCode").value.trim(),name:$("resetPlayerName").value.trim(),week:$("resetWeek").value,releaseType:$("resetReleaseType").value});if(result.ok)await refreshLeaderboard();}
-async function ownerArchiveResetLeaderboard(){if(!confirm("Archive all current leaderboard points and reset the visible leaderboard? Completed plays, adjustments, and bonus points will be saved to the Leaderboard Archive sheet."))return;const result=await runPortalAction("owner","ownerArchiveResetLeaderboard",{code:$("ownerCode").value.trim()});if(result.ok){await refreshLeaderboard();alert("Leaderboard archived and reset successfully.");}}
-async function ownerDeletePlayer(){const name=$("ownerDeletePlayerName").value.trim();if(!name)return alert("Enter a player name to delete.");if(!confirm("Completely delete all records for "+name+"? This cannot be undone."))return;const result=await runPortalAction("owner","ownerDeletePlayer",{code:$("ownerCode").value.trim(),name});if(result.ok)await refreshLeaderboard();}
+async function ownerResetPlayerRound(){const payload={code:$("ownerCode").value.trim(),name:$("resetPlayerName").value.trim(),week:$("resetWeek").value,releaseType:$("resetReleaseType").value};const result=await directApi("portalResetPlayerRound",payload);$("ownerOutput").textContent=JSON.stringify(result,null,2);if(!result.ok){alert(result.message||"Reset failed.");return;}await refreshLeaderboard();}
+async function ownerArchiveResetLeaderboard(){if(!confirm("Archive all current leaderboard points and reset the visible leaderboard? Completed plays, adjustments, and bonus points will be saved to the Leaderboard Archive sheet."))return;const result=await directApi("portalArchiveResetLeaderboard",{code:$("ownerCode").value.trim()});$("ownerOutput").textContent=JSON.stringify(result,null,2);if(!result.ok){alert(result.message||"Archive and reset failed.");return;}await refreshLeaderboard();alert("Leaderboard archived and reset successfully.");}
+async function ownerDeletePlayer(){const name=$("ownerDeletePlayerName").value.trim();if(!name)return alert("Enter a player name to delete.");if(!confirm("Completely delete all records for "+name+"? This cannot be undone."))return;const result=await directApi("portalDeletePlayerCompletely",{code:$("ownerCode").value.trim(),name});$("ownerOutput").textContent=JSON.stringify(result,null,2);if(!result.ok){alert(result.message||"Delete failed.");return;}await refreshLeaderboard();}
 
 
 
@@ -180,7 +187,7 @@ async function loadActiveDefault(){
 async function startOwnerPractice(){const verify=await api("ownerVerify",{code:$("ownerCode").value});if(!verify.ok){alert("Invalid owner code.");return;}const active=await api("getActiveProviderRound",{});if(!active.ok||!active.active){alert("No active round is open to practice.");return;}practiceMode=true;const gameName=active.active.game;const activeWeek=active.active.week;const activeRound=active.active.releaseType;session={name:"OWNER PRACTICE",week:activeWeek,game:gameName,releaseType:activeRound,redemption:activeRound==="redemption",playId:"PRACTICE-"+Date.now()};activeGameDef=GAME_BANK[gameName];activeQuestions=await getQuestionsForPlay(gameName,activeWeek,activeRound);qIndex=0;score=0;correct=0;$("entryPanel").classList.add("hidden");$("activeGamePanel").classList.remove("hidden");$("gameStatus").textContent="OWNER PRACTICE: "+activeWeek+" • "+gameName+" • "+(activeRound==="redemption"?"Make-Up":"Main");$("winnerRule").textContent="Practice only. No leaderboard points saved.";renderQuestion();}
 async function loadEditableQuestions(){const result=await api("getCustomQuestions",{code:$("ownerCode").value,week:$("editorWeek").value,releaseType:$("editorReleaseType").value,game:$("editorGame").value,includeDefault:true});$("ownerOutput").textContent=JSON.stringify(result,null,2);if(result.ok){$("questionEditorBox").value=JSON.stringify(result.questions||[],null,2);}}
 async function saveEditableQuestions(){let questions;try{questions=JSON.parse($("questionEditorBox").value||"[]");}catch(e){alert("Question editor is not valid JSON.");return;}const result=await api("saveCustomQuestions",{code:$("ownerCode").value,week:$("editorWeek").value,releaseType:$("editorReleaseType").value,game:$("editorGame").value,questions});$("ownerOutput").textContent=JSON.stringify(result,null,2);}
-async function clearEditableQuestions(){if(!confirm("Clear custom questions for this selected week/round/game and go back to default coded questions?"))return;const result=await runPortalAction("owner","clearCustomQuestions",{code:$("ownerCode").value.trim(),week:$("editorWeek").value,releaseType:$("editorReleaseType").value,game:$("editorGame").value});if(result.ok)$("questionEditorBox").value="";}
+async function clearEditableQuestions(){if(!confirm("Clear custom questions for this selected week/round/game and go back to default coded questions?"))return;const payload={code:$("ownerCode").value.trim(),week:$("editorWeek").value,releaseType:$("editorReleaseType").value,game:$("editorGame").value};const result=await directApi("portalClearCustomQuestions",payload);$("ownerOutput").textContent=JSON.stringify(result,null,2);if(!result.ok){alert(result.message||"Clear failed.");return;}$("questionEditorBox").value="";}
 
 function downloadJsonReport(filename,data){
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
@@ -209,7 +216,7 @@ async function activeRoundDashboard(){
 }
 async function forceCloseAllRounds(){
   if(!confirm("Force close all open rounds? This stops new joins and rejoining."))return;
-  const result=await runPortalAction("owner","forceCloseAllRounds",{code:$("ownerCode").value.trim()});if(result.ok)await loadActiveDefault();
+  const result=await directApi("portalForceCloseAllRounds",{code:$("ownerCode").value.trim()});$("ownerOutput").textContent=JSON.stringify(result,null,2);if(!result.ok){alert(result.message||"Force close failed.");return;}await loadActiveDefault();
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
