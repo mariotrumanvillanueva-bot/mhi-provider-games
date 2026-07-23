@@ -1,224 +1,329 @@
-/* MHI World Quest v40 - Fresh GitHub frontend */
+/* MHI World Quest v42 - Fresh frontend with resume, lockout, merge support */
 (function () {
-  "use strict";
+  'use strict';
 
-  const APP_VERSION = "40.0-FROM-SCRATCH";
-  let currentGame = null;
-  let currentQuestionIndex = 0;
-  let currentScore = 0;
-  let selectedWeek = "week1";
-  let selectedRoundType = "main";
+  var APP_VERSION = '42.2-NEW-URL-FIX';
+  var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby58uN2dk_Nl6kpsWG6pb-QrVRAKPWw9sfMceJjxcPxpPQqq_FZx7i1UEF9oQQYszNyGA/exec';
 
-  const $ = (id) => document.getElementById(id);
+  var currentGame = null;
+  var currentPlayer = '';
+  var currentWeek = 'week1';
+  var currentRoundType = 'main';
+  var currentQuestionIndex = 0;
+  var currentScore = 0;
+  var isWaiting = false;
+
+  function $(id) { return document.getElementById(id); }
 
   function setText(id, text) {
-    const el = $(id);
-    if (el) el.textContent = text || "";
+    var el = $(id);
+    if (el) el.textContent = text || '';
   }
 
-  function show(id, shouldShow) {
-    const el = $(id);
-    if (el) el.classList.toggle("hidden", !shouldShow);
+  function htmlEscape(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+    });
   }
 
-  function apiUrl() {
-    const url = window.MHI_CONFIG && window.MHI_CONFIG.API_URL;
-    if (!url || url.includes("PASTE_YOUR")) {
-      throw new Error("https://script.google.com/macros/s/AKfycby58uN2dk_Nl6kpsWG6pb-QrVRAKPWw9sfMceJjxcPxpPQqq_FZx7i1UEF9oQQYszNyGA/exec");
-    }
-    return url;
+  function show(id, yes) {
+    var el = $(id);
+    if (el) el.classList.toggle('hidden', !yes);
   }
 
-  // JSONP keeps GitHub Pages and Apps Script from fighting CORS.
-  function api(action, data = {}) {
-    return new Promise((resolve, reject) => {
-      const callbackName = "mhi_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1000000);
-      const payload = encodeURIComponent(JSON.stringify({ action, ...data }));
-      const src = apiUrl() + "?callback=" + callbackName + "&payload=" + payload + "&t=" + Date.now();
-      const script = document.createElement("script");
-      const timer = setTimeout(() => {
+  function setConnection(text, mode) {
+    var el = $('connectionStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'status-bar ' + (mode || '');
+  }
+
+  function setButtonLock(locked) {
+    isWaiting = locked;
+    var buttons = document.querySelectorAll('button');
+    buttons.forEach(function (b) { b.disabled = locked; });
+  }
+
+  function api(action, data) {
+    data = data || {};
+    return new Promise(function (resolve, reject) {
+      var callbackName = 'mhi_v42_cb_' + Date.now() + '_' + Math.floor(Math.random() * 999999);
+      var payload = encodeURIComponent(JSON.stringify(Object.assign({}, data, { action: action })));
+      var url = APPS_SCRIPT_URL + '?callback=' + encodeURIComponent(callbackName) + '&payload=' + payload + '&_=' + Date.now();
+      var script = document.createElement('script');
+      var done = false;
+
+      var timer = setTimeout(function () {
         cleanup();
-        reject(new Error("Apps Script did not respond. Check the /exec URL and deployment permissions."));
-      }, 20000);
+        reject(new Error('Apps Script did not respond. Open the /exec URL directly and confirm it says status ready.'));
+      }, 25000);
 
       function cleanup() {
+        if (done) return;
+        done = true;
         clearTimeout(timer);
-        delete window[callbackName];
-        if (script.parentNode) script.parentNode.removeChild(script);
+        try { delete window[callbackName]; } catch (err) { window[callbackName] = undefined; }
+        if (script && script.parentNode) script.parentNode.removeChild(script);
       }
 
-      window[callbackName] = (response) => {
+      window[callbackName] = function (response) {
         cleanup();
-        if (!response || response.ok === false) {
-          reject(new Error((response && response.message) || "Request failed."));
-        } else {
-          resolve(response);
-        }
+        if (!response) return reject(new Error('Empty response from Apps Script.'));
+        if (response.ok === false) return reject(new Error(response.message || 'Request failed.'));
+        resolve(response);
       };
 
-      script.onerror = () => {
+      script.onerror = function () {
         cleanup();
-        reject(new Error("Could not load Apps Script response. Make sure deployment access is allowed."));
+        reject(new Error('Could not load Apps Script response. Check deployment access and that the /exec URL is current.'));
       };
-      script.src = src;
+
+      script.src = url;
       document.body.appendChild(script);
     });
   }
 
   async function checkConnection() {
     try {
-      const res = await api("health");
-      setText("connectionStatus", "Connected to Apps Script version " + (res.version || "unknown") + ". Website v" + APP_VERSION + ".");
+      var res = await api('health');
+      var version = res.version || res.backendVersion || res.apiVersion || res.status || 'ready';
+      if (res.status === 'ready' || res.status === 'ok' || res.ok === true || res.ready === true || res.version) {
+        setConnection('Connected to Apps Script version ' + version + '. Website v' + APP_VERSION + '.', 'good');
+      } else {
+        setConnection('Connected to Apps Script. Website v' + APP_VERSION + '.', 'good');
+      }
+      return true;
     } catch (err) {
-      setText("connectionStatus", "Not connected: " + err.message);
+      setConnection('Not connected: ' + err.message, 'bad');
+      return false;
     }
   }
 
   async function refreshLeaderboard() {
     try {
-      const res = await api("getLeaderboard");
-      const rows = res.leaderboard || [];
-      const body = $("leaderboardBody");
+      var res = await api('getLeaderboard');
+      var rows = res.leaderboard || [];
+      var body = $('leaderboardBody');
+      if (!body) return;
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="4">No scores yet.</td></tr>';
+        body.innerHTML = '<tr><td colspan="5">No scores yet.</td></tr>';
         return;
       }
-      body.innerHTML = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.name)}</td><td>${r.score}</td><td>${escapeHtml(r.week || "")}</td></tr>`).join("");
+      body.innerHTML = rows.map(function (r, i) {
+        return '<tr><td>' + (i + 1) + '</td><td>' + htmlEscape(r.name) + '</td><td>' + htmlEscape(r.score) + '</td><td>' + htmlEscape(r.week) + '</td><td>' + htmlEscape(r.roundType) + '</td></tr>';
+      }).join('');
     } catch (err) {
-      setText("playerMessage", err.message);
+      setText('playerMessage', err.message);
     }
   }
 
-  function escapeHtml(value) {
-    return String(value == null ? "" : value).replace(/[&<>'"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch]));
-  }
-
-  async function loadActiveGame() {
-    const name = $("playerName").value.trim();
+  async function startOrResumeGame() {
+    if (isWaiting) return;
+    var name = ($('playerName') && $('playerName').value || '').trim();
     if (!name) {
-      setText("playerMessage", "Enter your name first.");
+      setText('playerMessage', 'Enter your name first.');
       return;
     }
+
+    setButtonLock(true);
+    setText('playerMessage', 'Checking your game status...');
+    setText('duplicateNote', '');
+    show('duplicateNote', false);
+
     try {
-      const settings = await api("getSettings");
-      if (!settings.roundOpen) {
-        setText("playerMessage", "The round is currently closed.");
+      var res = await api('startOrResumeGame', { name: name });
+      currentPlayer = res.name || name;
+      currentWeek = res.week || 'week1';
+      currentRoundType = res.roundType || 'main';
+      currentQuestionIndex = Number(res.questionIndex || 0);
+      currentScore = Number(res.score || 0);
+      currentGame = GAME_BANK.weeks[currentWeek] || GAME_BANK.weeks.week1;
+
+      if (res.duplicateNote) {
+        setText('duplicateNote', res.duplicateNote);
+        show('duplicateNote', true);
+      }
+
+      if (res.completed) {
+        show('gameCard', false);
+        setText('playerMessage', res.message || 'You already finished this round and cannot replay it.');
+        await refreshLeaderboard();
         return;
       }
-      selectedWeek = settings.activeWeek || "week1";
-      selectedRoundType = settings.roundType || "main";
-      currentGame = GAME_BANK.weeks[selectedWeek] || GAME_BANK.weeks.week1;
-      currentQuestionIndex = 0;
-      currentScore = 0;
-      show("gameCard", true);
-      setText("gameTitle", currentGame.title + " - " + selectedRoundType);
-      setText("playerMessage", "Game loaded. Good luck!");
+
+      show('gameCard', true);
+      setText('gameTitle', currentGame.title + ' — ' + prettyRound(currentRoundType));
+      setText('gameStyle', currentGame.style || '');
+      setText('playerMessage', res.message || 'Game loaded.');
       renderQuestion();
     } catch (err) {
-      setText("playerMessage", err.message);
+      setText('playerMessage', err.message);
+    } finally {
+      setButtonLock(false);
     }
+  }
+
+  function prettyRound(value) {
+    if (value === 'redemption') return 'Make-Up / Redemption';
+    if (value === 'final') return 'Final Tournament';
+    return 'Main Round';
   }
 
   function renderQuestion() {
     if (!currentGame) return;
-    const questions = currentGame.questions || [];
+    var questions = currentGame.questions || [];
     if (currentQuestionIndex >= questions.length) {
       finishGame();
       return;
     }
-    const item = questions[currentQuestionIndex];
-    setText("progressText", `Question ${currentQuestionIndex + 1} of ${questions.length}`);
-    setText("questionText", item.q);
-    const wrap = $("choicesWrap");
-    wrap.innerHTML = "";
-    item.choices.forEach((choice) => {
-      const btn = document.createElement("button");
-      btn.className = "choice";
+    var item = questions[currentQuestionIndex];
+    setText('progressText', 'Question ' + (currentQuestionIndex + 1) + ' of ' + questions.length + ' • ' + prettyRound(currentRoundType));
+    setText('questionText', item.q);
+    setText('scorePill', 'Score: ' + currentScore);
+    setText('answerFeedback', '');
+
+    var wrap = $('choicesWrap');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    item.choices.forEach(function (choice) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'choice';
       btn.textContent = choice;
-      btn.addEventListener("click", () => chooseAnswer(choice));
+      btn.addEventListener('click', function () { chooseAnswer(choice, btn); });
       wrap.appendChild(btn);
     });
-    setText("scoreText", "Current score: " + currentScore);
   }
 
-  function chooseAnswer(choice) {
-    const item = currentGame.questions[currentQuestionIndex];
-    if (choice === item.answer) currentScore += 10;
-    currentQuestionIndex += 1;
-    renderQuestion();
+  async function chooseAnswer(choice, button) {
+    if (isWaiting) return;
+    var item = currentGame.questions[currentQuestionIndex];
+    var correct = choice === item.answer;
+    var nextIndex = currentQuestionIndex + 1;
+    var nextScore = currentScore + (correct ? 10 : 0);
+
+    var choices = document.querySelectorAll('.choice');
+    choices.forEach(function (b) {
+      b.disabled = true;
+      if (b.textContent === item.answer) b.classList.add('correct');
+    });
+    if (!correct && button) button.classList.add('wrong');
+    setText('answerFeedback', correct ? 'Correct!' : 'Not quite. Correct answer: ' + item.answer);
+
+    try {
+      await api('saveProgress', {
+        name: currentPlayer,
+        week: currentWeek,
+        roundType: currentRoundType,
+        questionIndex: nextIndex,
+        score: nextScore,
+        totalQuestions: (currentGame.questions || []).length,
+        answer: choice,
+        correctAnswer: item.answer,
+        isCorrect: correct
+      });
+      currentQuestionIndex = nextIndex;
+      currentScore = nextScore;
+      setText('scorePill', 'Score: ' + currentScore);
+      setTimeout(renderQuestion, 650);
+    } catch (err) {
+      setText('answerFeedback', 'Could not save progress: ' + err.message);
+      choices.forEach(function (b) { b.disabled = false; });
+    }
   }
 
   async function finishGame() {
-    const name = $("playerName").value.trim();
-    setText("questionText", "Game complete!");
-    $("choicesWrap").innerHTML = "";
-    setText("progressText", "Final score: " + currentScore);
+    if (!currentGame) return;
+    var total = (currentGame.questions || []).length;
+    setText('questionText', 'Game complete!');
+    var wrap = $('choicesWrap');
+    if (wrap) wrap.innerHTML = '';
+    setText('progressText', 'Final score: ' + currentScore + ' out of ' + (total * 10));
+    setText('scorePill', 'Score: ' + currentScore);
     try {
-      await api("submitScore", { name, score: currentScore, week: selectedWeek, roundType: selectedRoundType });
-      setText("scoreText", "Score submitted.");
+      var res = await api('finishGame', {
+        name: currentPlayer,
+        week: currentWeek,
+        roundType: currentRoundType,
+        score: currentScore,
+        totalQuestions: total
+      });
+      setText('answerFeedback', res.message || 'Score submitted. You cannot replay this round unless an owner resets you.');
       await refreshLeaderboard();
     } catch (err) {
-      setText("scoreText", "Could not submit score: " + err.message);
+      setText('answerFeedback', 'Could not submit final score: ' + err.message);
     }
   }
 
   async function adminLogin() {
     try {
-      await api("adminLogin", { pin: $("adminPin").value });
-      show("adminPanel", true);
-      setText("adminMessage", "Admin unlocked.");
+      var res = await api('adminLogin', { pin: ($('adminPin') && $('adminPin').value) || '' });
+      show('adminPanel', true);
+      setText('adminMessage', res.message || 'Admin unlocked.');
     } catch (err) {
-      setText("adminMessage", err.message);
+      setText('adminMessage', err.message);
     }
   }
 
   async function ownerLogin() {
     try {
-      await api("ownerLogin", { pin: $("ownerPin").value });
-      show("ownerPanel", true);
-      setText("ownerMessage", "Owner unlocked.");
+      var res = await api('ownerLogin', { pin: ($('ownerPin') && $('ownerPin').value) || '' });
+      show('ownerPanel', true);
+      setText('ownerMessage', res.message || 'Owner unlocked.');
     } catch (err) {
-      setText("ownerMessage", err.message);
+      setText('ownerMessage', err.message);
     }
   }
 
-  async function runAdminAction(action, messageTarget, extra = {}) {
+  async function adminAction(action, target, extra) {
     try {
-      const res = await api(action, {
-        pin: $("adminPin").value || $("ownerPin").value,
-        week: $("weekSelect").value,
-        roundType: $("roundType").value,
-        ...extra
-      });
-      setText(messageTarget, res.message || "Done.");
+      var res = await api(action, Object.assign({
+        pin: (($('ownerPin') && $('ownerPin').value) || ($('adminPin') && $('adminPin').value) || ''),
+        adminPin: ($('adminPin') && $('adminPin').value) || '',
+        ownerPin: ($('ownerPin') && $('ownerPin').value) || '',
+        week: ($('weekSelect') && $('weekSelect').value) || 'week1',
+        roundType: ($('roundType') && $('roundType').value) || 'main'
+      }, extra || {}));
+      setText(target, res.message || 'Done.');
       await checkConnection();
       await refreshLeaderboard();
     } catch (err) {
-      setText(messageTarget, err.message);
+      setText(target, err.message);
     }
   }
 
   function bind(id, fn) {
-    const el = $(id);
-    if (el) el.addEventListener("click", fn);
+    var el = $(id);
+    if (el) el.addEventListener('click', fn);
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    bind("loadGameBtn", loadActiveGame);
-    bind("refreshLeaderboardBtn", refreshLeaderboard);
-    bind("adminLoginBtn", adminLogin);
-    bind("ownerLoginBtn", ownerLogin);
+  document.addEventListener('DOMContentLoaded', function () {
+    bind('loadGameBtn', startOrResumeGame);
+    bind('refreshLeaderboardBtn', refreshLeaderboard);
+    bind('adminLoginBtn', adminLogin);
+    bind('ownerLoginBtn', ownerLogin);
 
-    bind("setWeekGameBtn", () => runAdminAction("setWeekGame", "adminMessage"));
-    bind("openRoundBtn", () => runAdminAction("openRound", "adminMessage"));
-    bind("closeRoundBtn", () => runAdminAction("closeRound", "adminMessage"));
-    bind("clearCustomQuestionsBtn", () => runAdminAction("clearCustomQuestions", "adminMessage"));
+    bind('setWeekGameBtn', function () { adminAction('setWeekGame', 'adminMessage'); });
+    bind('openRoundBtn', function () { adminAction('openRound', 'adminMessage'); });
+    bind('closeRoundBtn', function () { adminAction('closeRound', 'adminMessage'); });
+    bind('clearCustomQuestionsBtn', function () { adminAction('clearCustomQuestions', 'adminMessage'); });
 
-    bind("forceCloseAllRoundsBtn", () => runAdminAction("forceCloseAllRounds", "ownerMessage"));
-    bind("resetPlayerRoundBtn", () => runAdminAction("resetPlayerRound", "ownerMessage", { name: $("resetPlayerName").value.trim() }));
-    bind("deletePlayerCompletelyBtn", () => runAdminAction("deletePlayerCompletely", "ownerMessage", { name: $("resetPlayerName").value.trim() }));
-    bind("archiveResetLeaderboardBtn", () => {
-      if (confirm("Archive active scores and reset the leaderboard?")) runAdminAction("archiveResetLeaderboard", "ownerMessage");
+    bind('forceCloseAllRoundsBtn', function () { adminAction('forceCloseAllRounds', 'ownerMessage'); });
+    bind('resetPlayerRoundBtn', function () {
+      adminAction('resetPlayerRound', 'ownerMessage', { name: (($('resetPlayerName') && $('resetPlayerName').value) || '').trim() });
+    });
+    bind('deletePlayerCompletelyBtn', function () {
+      var name = (($('resetPlayerName') && $('resetPlayerName').value) || '').trim();
+      if (name && confirm('Delete all records for ' + name + '?')) adminAction('deletePlayerCompletely', 'ownerMessage', { name: name });
+    });
+    bind('mergeUsersBtn', function () {
+      adminAction('mergeUsers', 'ownerMessage', {
+        fromName: (($('mergeFromName') && $('mergeFromName').value) || '').trim(),
+        toName: (($('mergeToName') && $('mergeToName').value) || '').trim()
+      });
+    });
+    bind('archiveResetLeaderboardBtn', function () {
+      if (confirm('Archive scores and reset active leaderboard/progress?')) adminAction('archiveResetLeaderboard', 'ownerMessage');
     });
 
     checkConnection();
