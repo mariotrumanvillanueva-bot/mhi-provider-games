@@ -1,0 +1,269 @@
+<script>
+(() => {
+let session=null,qIndex=0,score=0,correct=0,activeQuestions=[],activeGameDef=null,selectedChecks=new Set(),answerLocked=false,practiceMode=false;const $=id=>document.getElementById(id);
+function shuffleArray(items){return [...items].sort(()=>Math.random()-0.5);}
+function shuffledChoices(question){return question.a.map((text,index)=>({text,index})).sort(()=>Math.random()-0.5);}
+function pointsForCorrect(){
+  if(session && session.game==="World Quest Tie-Breaker") return SCORE_RULES.tieBreakerCorrectAnswer;
+  if(session && session.week==="Final Kahoot") return SCORE_RULES.finalCorrectAnswer;
+  return SCORE_RULES.correctAnswer;
+}
+function pointsForCompletion(){
+  if(session && session.game==="World Quest Tie-Breaker") return SCORE_RULES.tieBreakerCompletion;
+  if(session && session.week==="Final Kahoot") return SCORE_RULES.finalCompletion;
+  return SCORE_RULES.completion;
+}
+
+async function api(action,payload={}){return await new Promise((resolve,reject)=>{if(!(window.google&&google.script&&google.script.run)){reject(new Error("This page must be opened from the deployed Apps Script web app."));return;}google.script.run.withSuccessHandler(resolve).withFailureHandler(err=>reject(new Error((err&&err.message)||String(err)))).apiGateway(action,payload);});}
+async function getQuestionsForPlay(gameName,week,releaseType){const gameDef=GAME_BANK[gameName];let questions=filterQuestionsForWeek(gameDef,week,releaseType==="redemption");try{const custom=await api("getCustomQuestions",{game:gameName,week,releaseType});if(custom.ok&&custom.questions&&custom.questions.length){questions=custom.questions;}}catch(e){}return questions;}
+async function joinGame(){const name=$("playerName").value.trim().replace(/\s+/g," ");const week=$("weekSelect").value;const round=$("roundSelect").value;if(!name)return alert("Enter your name first.");try{let result=await api("joinGame",{name,week,releaseType:round});if(result.requiresConfirmation || result.similarNameWarning){
+  const proceed=confirm(result.message||"A similar name is already being used. Continue?");
+  if(!proceed)return;
+  const confirmResult=await api("joinGame",{name,week,releaseType:round,confirmOldTypo:true,similarNameConfirmation:true});
+  if(!confirmResult.ok){alert(confirmResult.message||"You cannot join this round.");return;}
+  result=confirmResult;
+}
+if(!result.ok){alert(result.message||"You cannot join this round.");return;}const gameName=result.game;const activeWeek=result.week||week;const activeRound=result.releaseType||round;session={name,week:activeWeek,game:gameName,releaseType:activeRound,redemption:activeRound==="redemption",playId:result.playId};$("weekSelect").value=activeWeek;$("roundSelect").value=activeRound;activeGameDef=GAME_BANK[gameName];activeQuestions=await getQuestionsForPlay(gameName,activeWeek,activeRound);if(!activeQuestions||activeQuestions.length===0){alert("This game has no questions for this round.");return;}if(result.resume){qIndex=Math.min(result.progress.qIndex||0,activeQuestions.length-1);score=result.progress.score||0;correct=result.progress.correct||0;}else{qIndex=0;score=0;correct=0;}$("entryPanel").classList.add("hidden");$("activeGamePanel").classList.remove("hidden");$("gameStatus").textContent=(result.statusText||"Open")+": "+gameName;$("winnerRule").textContent=activeGameDef.prizeEligible&&!session.redemption?"Top player + prize points":"Top player tracked, no prize points";renderQuestion();await refreshLeaderboard();}catch(e){alert(e.message);}}
+function renderQuestion(){answerLocked=false;const q=activeQuestions[qIndex];$("questionText").textContent=q.q;$("answers").innerHTML="";$("matchingBox").innerHTML="";$("typedAnswerBox").classList.add("hidden");$("matchingBox").classList.add("hidden");$("nextBtn").disabled=true;selectedChecks=new Set();$("feedback").textContent="Current score: "+score;if(activeGameDef.type==="choice"){shuffledChoices(q).forEach((choice)=>{const btn=document.createElement("button");btn.type="button";btn.className="answer-btn";btn.textContent=choice.text;btn.addEventListener("click",()=>answerQuestion(choice.index===q.c,btn));$("answers").appendChild(btn);});}if(activeGameDef.type==="typed")$("typedAnswerBox").classList.remove("hidden");if(activeGameDef.type==="selectAll"){shuffledChoices(q).forEach((choice)=>{const btn=document.createElement("button");btn.type="button";btn.className="answer-btn";btn.textContent=choice.text;btn.addEventListener("click",()=>{if(selectedChecks.has(choice.index)){selectedChecks.delete(choice.index);btn.classList.remove("correct");}else{selectedChecks.add(choice.index);btn.classList.add("correct");}});$("answers").appendChild(btn);});const submit=document.createElement("button");submit.type="button";submit.textContent="Submit Selected Answers";submit.addEventListener("click",submitSelectAll);$("answers").appendChild(submit);}if(activeGameDef.type==="matching"){$("matchingBox").classList.remove("hidden");const right=q.pairs.map(p=>p[1]).sort(()=>Math.random()-.5);q.pairs.forEach(pair=>{const row=document.createElement("div");row.className="match-row";const left=document.createElement("strong");left.textContent=pair[0];const sel=document.createElement("select");sel.dataset.correct=pair[1];sel.innerHTML='<option value="">Choose match</option>'+right.map(r=>'<option value="'+r+'">'+r+'</option>').join("");row.appendChild(left);row.appendChild(sel);$("matchingBox").appendChild(row);});const submit=document.createElement("button");submit.type="button";submit.textContent="Submit Matching";submit.addEventListener("click",submitMatching);$("matchingBox").appendChild(submit);}}
+function submitTyped(){const q=activeQuestions[qIndex];const guess=$("typedAnswer").value.trim().toLowerCase();if(!guess)return alert("Type an answer first.");answerQuestion(guess===q.answer.toLowerCase());$("typedAnswer").value="";}
+function submitSelectAll(){const q=activeQuestions[qIndex];answerQuestion([...selectedChecks].sort().join(",")===[...q.c].sort().join(","));}
+function submitMatching(){const selects=[...document.querySelectorAll("#matchingBox select")];answerQuestion(selects.every(sel=>sel.value&&sel.value===sel.dataset.correct));}
+async function saveProgress(){if(!session)return;try{await api("saveProgress",{playId:session.playId,qIndex,score,correct});}catch(e){}}
+function answerQuestion(isCorrect,clickedBtn){
+if(answerLocked)return;
+answerLocked=true;
+[...document.querySelectorAll(".answer-btn")].forEach(btn=>btn.disabled=true);
+[...document.querySelectorAll("#matchingBox select")].forEach(sel=>sel.disabled=true);
+if($("typedAnswer"))$("typedAnswer").disabled=true;
+if(clickedBtn)clickedBtn.classList.add(isCorrect?"correct":"wrong");
+if(isCorrect){
+  score += pointsForCorrect();
+  correct++;
+  $("feedback").textContent="Correct! Current score: "+score;
+}
+else $("feedback").textContent="Not quite. Current score: "+score;
+$("nextBtn").disabled=true;
+saveProgress();
+setTimeout(()=>{nextQuestion();},900);
+}
+async function nextQuestion(){answerLocked=false;if($('typedAnswer'))$('typedAnswer').disabled=false;qIndex++;if(!practiceMode)await saveProgress();if(qIndex<activeQuestions.length)return renderQuestion();score += pointsForCompletion();try{if(practiceMode){$("questionText").textContent="Practice complete. Final practice score: "+score+". No leaderboard points were saved.";await api("logPracticeRun",{code:$("ownerCode").value,game:session.game,week:session.week,releaseType:session.releaseType,score,correct});}else{const result=await api("submitScore",{playId:session.playId,name:session.name,week:session.week,game:session.game,releaseType:session.releaseType,score,correct,answered:activeQuestions.length,prizeEligible:activeGameDef.prizeEligible&&!session.redemption,badge:BADGE_RULES[session.game]||'',difficulty:difficultyForWeek(session.week)});$("questionText").textContent=result.message||("Game complete. Final score: "+score);}$("answers").innerHTML="";$("typedAnswerBox").classList.add("hidden");$("matchingBox").classList.add("hidden");$("nextBtn").disabled=true;await refreshLeaderboard();}catch(e){alert(e.message);}}
+function exitToEntry(){$("entryPanel").classList.remove("hidden");$("activeGamePanel").classList.add("hidden");saveProgress();}
+async function refreshLeaderboard(){try{const result=await api("leaderboard",{});if(!result.ok)return;$("leaderboard").innerHTML="";result.leaderboard.forEach(row=>{const li=document.createElement("li");li.innerHTML="<strong>"+row.name+"</strong> — "+row.totalPoints+" pts<br><small>Prize points: "+row.prizePoints+" • Bonus: "+(row.bonusPoints||0)+" • Games: "+row.gamesPlayed+(row.badges?" • Badges: "+row.badges:"")+"</small>";$("leaderboard").appendChild(li);});}catch(e){$("leaderboard").innerHTML="<li>"+e.message+"</li>";}}
+function downloadCSV(filename,rows){const csv=rows.map(r=>r.map(v=>'"'+String(v??"").replaceAll('"','""')+'"').join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);}
+function downloadExcelReport(filename,rows){
+  const safe=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+  const html=`<html><head><meta charset="UTF-8"></head><body>
+  <h2>MHI Provider Coordinator Leaderboard</h2>
+  <p>Use the "External Bonus Points" tab in the backend Google Sheet to add bonus points. Refresh the leaderboard after editing.</p>
+  <table border="1">${rows.map((r,i)=>"<tr>"+r.map(c=>i===0?"<th>"+safe(c)+"</th>":"<td>"+safe(c)+"</td>").join("")+"</tr>").join("")}</table>
+  <br/>
+  <h3>External Bonus Points Entry Template</h3>
+  <table border="1">
+  <tr><th>Date</th><th>Name</th><th>Normalized Name</th><th>Week</th><th>Bonus Type</th><th>Points</th><th>Reason</th><th>Added By</th><th>Notes</th></tr>
+  <tr><td></td><td>Player Name</td><td>auto-filled in backend if blank</td><td>Week 1</td><td>Trivia Bonus</td><td>5</td><td>Example reason</td><td>Owner/Admin</td><td></td></tr>
+  </table>
+  </body></html>`;
+  const blob=new Blob([html],{type:"application/vnd.ms-excel"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+async function exportLeaderboard(code,outputId){const result=await api("exportLeaderboard",{code});if(!result.ok){if(outputId)$(outputId).textContent=JSON.stringify(result,null,2);else alert(result.message||"Export denied.");return;}downloadExcelReport("mhi_provider_coordinators_leaderboard.xls",result.rows);if(outputId)$(outputId).textContent="Leaderboard exported.";}
+async function adminLogin(){
+  const status=$("adminLoginStatus");
+  if(status)status.textContent="Checking admin code...";
+  try{
+    const result=await api("adminVerify",{code:$("adminCode").value.trim()});
+    if(result.ok){$("adminPanel").classList.remove("hidden");if(status)status.textContent="Admin functions unlocked.";await verifyBackendVersion("adminOutput");}
+    else{if(status)status.textContent=result.message||"Invalid admin code.";alert(result.message||"Invalid admin code.");}
+  }catch(e){if(status)status.textContent="Connection error: "+e.message;alert("Admin login could not connect: "+e.message);}
+}
+async function ownerLogin(){
+  const status=$("ownerLoginStatus");
+  if(status)status.textContent="Checking owner code...";
+  try{
+    const result=await api("ownerVerify",{code:$("ownerCode").value.trim()});
+    if(result.ok){$("ownerPanel").classList.remove("hidden");if(status)status.textContent="Owner functions unlocked.";await verifyBackendVersion("ownerOutput");}
+    else{if(status)status.textContent=result.message||"Invalid owner code.";alert(result.message||"Invalid owner code.");}
+  }catch(e){if(status)status.textContent="Connection error: "+e.message;alert("Owner login could not connect: "+e.message);}
+}
+async function verifyBackendVersion(outputId){
+  const result=await api("backendVersion",{});
+  const output=$(outputId);
+  if(!result.ok||false){
+    const msg="Connected to Apps Script version "+String(result.version||"unknown")+".";
+    if(output)output.textContent=msg+" Current backend response: "+JSON.stringify(result);
+    if(output)output.textContent=msg;
+    return true;
+  }
+  return true;
+}
+async function runPortalAction(role, actionName, payload){
+  const output=$(role==="owner"?"ownerOutput":"adminOutput");
+  if(output)output.textContent="Working...";
+  try{
+    const result=await api(actionName,payload);
+    if(output)output.textContent=JSON.stringify(result,null,2);
+    if(!result.ok)alert(result.message||"The action could not be completed.");
+    return result;
+  }catch(e){
+    if(output)output.textContent="Connection error: "+e.message;
+    alert("The portal could not complete this action: "+e.message);
+    return{ok:false,message:e.message};
+  }
+}
+async function setRelease(role,status){
+  const code=role==="owner"?$("ownerCode").value.trim():$("adminCode").value.trim();
+  const week=role==="owner"?$("ownerWeek").value:$("adminWeek").value;
+  const releaseType=role==="owner"?$("ownerReleaseType").value:$("adminReleaseType").value;
+  const result=await runPortalAction(role,"setReleaseStatus",{role,code,week,releaseType,status});
+  if(result.ok){await loadActiveDefault();alert(result.message||"Game setting saved.");}
+}
+async function setWeekGame(role){
+  const code=role==="owner"?$("ownerCode").value.trim():$("adminCode").value.trim();
+  const week=role==="owner"?$("ownerWeek").value:$("adminWeek").value;
+  const releaseType=role==="owner"?$("ownerReleaseType").value:$("adminReleaseType").value;
+  const game=role==="owner"?$("ownerGameChoice").value:$("adminGameChoice").value;
+  const result=await runPortalAction(role,"setWeekGame",{role,code,week,releaseType,game});
+  if(result.ok)await loadActiveDefault();
+}
+async function fairPlayAudit(){await runPortalAction("admin","fairPlayAudit",{code:$("adminCode").value.trim()});}
+async function ownerAdjust(){const result=await runPortalAction("owner","ownerAdjust",{code:$("ownerCode").value.trim(),name:$("adjustName").value.trim(),points:Number($("adjustPoints").value),reason:$("adjustReason").value.trim()});if(result.ok)await refreshLeaderboard();}
+async function ownerAction(action){return await runPortalAction("owner",action,{code:$("ownerCode").value.trim()});}
+async function setupBonusPointsSheet(role){const code=role==="owner"?$("ownerCode").value:$("adminCode").value;const result=await api("setupBonusPointsSheet",{code});$(role==="owner"?"ownerOutput":"adminOutput").textContent=JSON.stringify(result,null,2);await refreshLeaderboard();}
+async function renamePlayer(role){const code=role==="owner"?$("ownerCode").value:$("adminCode").value;const oldName=role==="owner"?$("ownerOldName").value:$("adminOldName").value;const newName=role==="owner"?$("ownerNewName").value:$("adminNewName").value;const result=await api("renamePlayerTypo",{role,code,oldName,newName});$(role==="owner"?"ownerOutput":"adminOutput").textContent=JSON.stringify(result,null,2);await refreshLeaderboard();}
+async function ownerResetPlayerRound(){const result=await runPortalAction("owner","ownerResetPlayerRound",{code:$("ownerCode").value.trim(),name:$("resetPlayerName").value.trim(),week:$("resetWeek").value,releaseType:$("resetReleaseType").value});if(result.ok)await refreshLeaderboard();}
+async function ownerArchiveResetLeaderboard(){if(!confirm("Archive all current leaderboard points and reset the visible leaderboard? Completed plays, adjustments, and bonus points will be saved to the Leaderboard Archive sheet."))return;const result=await runPortalAction("owner","ownerArchiveResetLeaderboard",{code:$("ownerCode").value.trim()});if(result.ok){await refreshLeaderboard();alert("Leaderboard archived and reset successfully.");}}
+async function ownerDeletePlayer(){const name=$("ownerDeletePlayerName").value.trim();if(!name)return alert("Enter a player name to delete.");if(!confirm("Completely delete all records for "+name+"? This cannot be undone."))return;const result=await runPortalAction("owner","ownerDeletePlayer",{code:$("ownerCode").value.trim(),name});if(result.ok)await refreshLeaderboard();}
+
+
+
+async function generateTempAdminCode(){
+  const result=await runPortalAction("owner","generateTempAdminCode",{code:$("ownerCode").value.trim()});
+  if(result.ok&&result.tempCode)alert("Temporary admin code: "+result.tempCode);
+}
+async function loadOwnerLogs(){await runPortalAction("owner","getActionLogs",{code:$("ownerCode").value.trim()});}
+async function loadSuspiciousActivity(){await runPortalAction("owner","getSuspiciousActivity",{code:$("ownerCode").value.trim()});}
+
+function applyActiveRoundLock(active){
+  const hasActive=active && active.week;
+  $("weekSelect").disabled=!!hasActive;
+  $("roundSelect").disabled=!!hasActive;
+}
+
+async function loadActiveDefault(){
+  try{
+    const result=await api("getActiveProviderRound",{});
+    const notice=$("activeDefaultNotice");
+    if(result.ok && result.active && result.active.week){
+      $("weekSelect").value=result.active.week;
+      $("roundSelect").value=result.active.releaseType || "main";
+      applyActiveRoundLock(result.active);
+      if(notice){
+        notice.textContent="Active open game: "+result.active.week+" • "+(result.active.game||"Selected game")+" • "+(result.active.releaseType==="redemption"?"Make-Up":"Main Weekly Game")+". Players can only play this active round.";
+      }
+    }else if(notice){applyActiveRoundLock(null);
+      notice.textContent="No round is open yet. Admin/Owner must open a game before players can start.";
+    }
+  }catch(e){
+    const notice=$("activeDefaultNotice");
+    if(notice)notice.textContent="Unable to check active open game yet.";applyActiveRoundLock(null);
+  }
+}
+
+
+async function startOwnerPractice(){const verify=await api("ownerVerify",{code:$("ownerCode").value});if(!verify.ok){alert("Invalid owner code.");return;}const active=await api("getActiveProviderRound",{});if(!active.ok||!active.active){alert("No active round is open to practice.");return;}practiceMode=true;const gameName=active.active.game;const activeWeek=active.active.week;const activeRound=active.active.releaseType;session={name:"OWNER PRACTICE",week:activeWeek,game:gameName,releaseType:activeRound,redemption:activeRound==="redemption",playId:"PRACTICE-"+Date.now()};activeGameDef=GAME_BANK[gameName];activeQuestions=await getQuestionsForPlay(gameName,activeWeek,activeRound);qIndex=0;score=0;correct=0;$("entryPanel").classList.add("hidden");$("activeGamePanel").classList.remove("hidden");$("gameStatus").textContent="OWNER PRACTICE: "+activeWeek+" • "+gameName+" • "+(activeRound==="redemption"?"Make-Up":"Main");$("winnerRule").textContent="Practice only. No leaderboard points saved.";renderQuestion();}
+async function loadEditableQuestions(){const result=await api("getCustomQuestions",{code:$("ownerCode").value,week:$("editorWeek").value,releaseType:$("editorReleaseType").value,game:$("editorGame").value,includeDefault:true});$("ownerOutput").textContent=JSON.stringify(result,null,2);if(result.ok){$("questionEditorBox").value=JSON.stringify(result.questions||[],null,2);}}
+async function saveEditableQuestions(){let questions;try{questions=JSON.parse($("questionEditorBox").value||"[]");}catch(e){alert("Question editor is not valid JSON.");return;}const result=await api("saveCustomQuestions",{code:$("ownerCode").value,week:$("editorWeek").value,releaseType:$("editorReleaseType").value,game:$("editorGame").value,questions});$("ownerOutput").textContent=JSON.stringify(result,null,2);}
+async function clearEditableQuestions(){if(!confirm("Clear custom questions for this selected week/round/game and go back to default coded questions?"))return;const result=await runPortalAction("owner","clearCustomQuestions",{code:$("ownerCode").value.trim(),week:$("editorWeek").value,releaseType:$("editorReleaseType").value,game:$("editorGame").value});if(result.ok)$("questionEditorBox").value="";}
+
+function downloadJsonReport(filename,data){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);
+}
+function downloadExcelRows(filename,title,rows){
+  const safe=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+  const html=`<html><head><meta charset="UTF-8"></head><body><h2>${safe(title)}</h2><table border="1">${rows.map((r,i)=>"<tr>"+r.map(c=>i===0?"<th>"+safe(c)+"</th>":"<td>"+safe(c)+"</td>").join("")+"</tr>").join("")}</table></body></html>`;
+  const blob=new Blob([html],{type:"application/vnd.ms-excel"});
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);
+}
+async function exportAuditReport(code,outId){
+  const result=await api("fullAuditReport",{code});$(outId).textContent=JSON.stringify(result,null,2);
+  if(result.ok)downloadJsonReport("world_quest_audit_report.json",result);
+}
+async function exportBonusReport(code,outId){
+  const result=await api("bonusPointReport",{code});$(outId).textContent=JSON.stringify(result,null,2);
+  if(result.ok){const rows=[["Date","Name","Week","Bonus Type","Points","Reason","Added By","Notes"]];(result.rows||[]).forEach(r=>rows.push([r.date,r.name,r.week,r.bonusType,r.points,r.reason,r.addedBy,r.notes]));downloadExcelRows("world_quest_bonus_points_report.xls","World Quest Bonus Points Report",rows);}
+}
+async function exportMakeupReport(code,outId){
+  const result=await api("makeupEligibilityReport",{code});$(outId).textContent=JSON.stringify(result,null,2);
+  if(result.ok){const rows=[["Name","Week","Completed Main","Completed Make-Up","Eligible If Round Opens"]];(result.rows||[]).forEach(r=>rows.push([r.name,r.week,r.completedMain,r.completedMakeup,r.eligible]));downloadExcelRows("world_quest_makeup_eligibility.xls","World Quest Make-Up Eligibility Report",rows);}
+}
+async function activeRoundDashboard(){
+  const result=await api("activeRoundDashboard",{code:$("ownerCode").value});$("ownerOutput").textContent=JSON.stringify(result,null,2);
+}
+async function forceCloseAllRounds(){
+  if(!confirm("Force close all open rounds? This stops new joins and rejoining."))return;
+  const result=await runPortalAction("owner","forceCloseAllRounds",{code:$("ownerCode").value.trim()});if(result.ok)await loadActiveDefault();
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  const on=(id,event,handler)=>{const el=$(id);if(el)el.addEventListener(event,handler);};
+  on("joinBtn","click",joinGame);
+  on("submitTypedBtn","click",submitTyped);
+  if($("nextBtn"))$("nextBtn").style.display="none";
+  on("exitBtn","click",exitToEntry);
+  on("refreshBtn","click",refreshLeaderboard);
+  on("exportBtn","click",()=>exportLeaderboard($("exportCode").value));
+  on("adminLoginBtn","click",adminLogin);
+  on("ownerLoginBtn","click",ownerLogin);
+  on("adminSetGameBtn","click",()=>setWeekGame("admin"));
+  on("ownerSetGameBtn","click",()=>setWeekGame("owner"));
+  on("adminOpenBtn","click",()=>setRelease("admin","Open"));
+  on("adminCloseBtn","click",()=>setRelease("admin","Closed"));
+  on("ownerOpenBtn","click",()=>setRelease("owner","Open"));
+  on("ownerCloseBtn","click",()=>setRelease("owner","Closed"));
+  on("ownerPracticeBtn","click",startOwnerPractice);
+  on("ownerLoadQuestionsBtn","click",loadEditableQuestions);
+  on("ownerSaveQuestionsBtn","click",saveEditableQuestions);
+  on("ownerResetQuestionsBtn","click",clearEditableQuestions);
+  on("adminAuditBtn","click",fairPlayAudit);
+  on("adminExportBtn","click",()=>exportLeaderboard($("adminCode").value,"adminOutput"));
+  on("adminSetupBonusBtn","click",()=>setupBonusPointsSheet("admin"));
+  on("ownerExportBtn","click",()=>exportLeaderboard($("ownerCode").value,"ownerOutput"));
+  on("ownerSetupBonusBtn","click",()=>setupBonusPointsSheet("owner"));
+  on("adminRenamePlayerBtn","click",()=>renamePlayer("admin"));
+  on("ownerRenamePlayerBtn","click",()=>renamePlayer("owner"));
+  on("ownerAdjustBtn","click",ownerAdjust);
+  on("ownerResetPlayerBtn","click",ownerResetPlayerRound);
+  on("ownerResetLeaderboardBtn","click",ownerArchiveResetLeaderboard);
+  on("ownerDeletePlayerBtn","click",ownerDeletePlayer);
+  on("ownerGenerateTempBtn","click",generateTempAdminCode);
+  on("ownerLogsBtn","click",loadOwnerLogs);
+  on("ownerSuspiciousBtn","click",loadSuspiciousActivity);
+  on("ownerReportBtn","click",()=>ownerAction("internalSummaryReport"));
+  on("ownerParticipationBtn","click",()=>ownerAction("participationReport"));
+  on("ownerMakeupLegacyBtn","click",()=>ownerAction("redemptionReport"));
+  on("ownerPrizeBtn","click",()=>ownerAction("prizePointsReport"));
+  on("ownerAuditBtn","click",()=>ownerAction("deepAuditReport"));
+  on("ownerActiveDashboardBtn","click",activeRoundDashboard);
+  on("ownerForceCloseBtn","click",forceCloseAllRounds);
+  on("ownerAuditExportBtn","click",()=>exportAuditReport($("ownerCode").value,"ownerOutput"));
+  on("ownerBonusReportBtn","click",()=>exportBonusReport($("ownerCode").value,"ownerOutput"));
+  on("ownerMakeupReportBtn","click",()=>exportMakeupReport($("ownerCode").value,"ownerOutput"));
+  on("adminAuditExportBtn","click",()=>exportAuditReport($("adminCode").value,"adminOutput"));
+  on("adminMakeupReportBtn","click",()=>exportMakeupReport($("adminCode").value,"adminOutput"));
+
+  on("adminWeek","change",()=>{if($("ownerWeek"))$("ownerWeek").value=$("adminWeek").value;});
+  on("ownerWeek","change",()=>{if($("adminWeek"))$("adminWeek").value=$("ownerWeek").value;});
+  on("adminReleaseType","change",()=>{if($("ownerReleaseType"))$("ownerReleaseType").value=$("adminReleaseType").value;});
+  on("ownerReleaseType","change",()=>{if($("adminReleaseType"))$("adminReleaseType").value=$("ownerReleaseType").value;});
+  refreshLeaderboard();
+  loadActiveDefault();
+});
+})();
+
+</script>
