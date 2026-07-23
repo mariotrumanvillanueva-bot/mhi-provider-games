@@ -2,14 +2,75 @@ const ADMIN_CODE="MHI-ADMIN-FRIDAY-2026";
 const OWNER_CODE="MHI-OWNER-MARIO-TV-2026";
 const TEMP_ADMIN_MINUTES=60;
 const SHEETS={SETTINGS:"Settings",PLAYERS:"Players",PLAYS:"Plays",ADJUSTMENTS:"Adjustments",ACTION_LOGS:"Action Logs",TEMP_CODES:"Temporary Admin Codes",SUSPICIOUS:"Suspicious Activity",FUN_SCORES:"Fun Scores",CORRECTIONS:"Name Corrections",BONUS_POINTS:"External Bonus Points",CUSTOM_QUESTIONS:"Custom Questions"};
-function doPost(e){try{const data=JSON.parse(e.postData.contents||"{}");const a=data.action;
-if(a==="joinGame")return json(joinGame(data,e));if(a==="saveProgress")return json(saveProgress(data,e));if(a==="submitScore")return json(submitScore(data,e));if(a==="leaderboard")return json(getLeaderboard());if(a==="exportLeaderboard")return json(exportLeaderboard(data,e));if(a==="adminVerify")return json({ok:isAdmin(data.code)});if(a==="ownerVerify")return json({ok:isOwner(data.code)});if(a==="setReleaseStatus")return json(setReleaseStatus(data,e));if(a==="setWeekGame")return json(setWeekGame(data,e));if(a==="renamePlayerTypo")return json(renamePlayerTypo(data,e));if(a==="fairPlayAudit")return json(fairPlayAudit(data));if(a==="ownerAdjust")return json(ownerAdjust(data,e));if(a==="ownerResetPlayerRound")return json(ownerResetPlayerRound(data,e));if(a==="ownerArchiveResetLeaderboard")return json(ownerArchiveResetLeaderboard(data,e));if(a==="ownerDeletePlayer")return json(ownerDeletePlayer(data,e));if(a==="ownerDeletePlayerCompletely")return json(ownerDeletePlayer(data,e));if(a==="generateTempAdminCode")return json(generateTempAdminCode(data,e));if(a==="getActionLogs")return json(getActionLogs(data));if(a==="getSuspiciousActivity")return json(getSuspiciousActivity(data));if(a==="internalSummaryReport")return json(internalSummaryReport(data));if(a==="participationReport")return json(participationReport(data));if(a==="redemptionReport")return json(redemptionReport(data));if(a==="prizePointsReport")return json(prizePointsReport(data));if(a==="getActiveProviderRound")return json(getActiveProviderRound(data));if(a==="submitFunScore")return json(submitFunScore(data,e));if(a==="funLeaderboard")return json(funLeaderboard(data));if(a==="deleteFunUser")return json(deleteFunUser(data,e));if(a==="deepAuditReport")return json(deepAuditReport(data));if(a==="setupBonusPointsSheet")return json(setupBonusPointsSheet(data,e));if(a==="getCustomQuestions")return json(getCustomQuestions(data));if(a==="saveCustomQuestions")return json(saveCustomQuestions(data,e));if(a==="clearCustomQuestions")return json(clearCustomQuestions(data,e));if(a==="logPracticeRun")return json(logPracticeRun(data,e));
-if(a==="fullAuditReport")return json(fullAuditReport(data));
-if(a==="bonusPointReport")return json(bonusPointReport(data));
-if(a==="makeupEligibilityReport")return json(makeupEligibilityReport(data));
-if(a==="activeRoundDashboard")return json(activeRoundDashboard(data));
-if(a==="forceCloseAllRounds")return json(forceCloseAllRounds(data,e));
-return json({ok:false,message:"Unknown action."});}catch(err){return json({ok:false,message:String(err)});}}
+const BACKEND_VERSION="30.4";
+function normalizeActionName(value){
+  const raw=String(value||"").trim();
+  const compact=raw.toLowerCase().replace(/[^a-z0-9]/g,"");
+  const aliases={
+    backendversion:"backendVersion",
+    adminverify:"adminVerify",ownerverify:"ownerVerify",
+    setreleasestatus:"setReleaseStatus",closeround:"setReleaseStatus",openround:"setReleaseStatus",
+    setweekgame:"setWeekGame",setgame:"setWeekGame",
+    clearcustomquestions:"clearCustomQuestions",resetcustomquestions:"clearCustomQuestions",
+    forcecloseallrounds:"forceCloseAllRounds",closeallrounds:"forceCloseAllRounds",
+    ownerresetplayerround:"ownerResetPlayerRound",resetplayerround:"ownerResetPlayerRound",
+    ownerarchiveresetleaderboard:"ownerArchiveResetLeaderboard",archiveresetleaderboard:"ownerArchiveResetLeaderboard",resetleaderboard:"ownerArchiveResetLeaderboard",
+    ownerdeleteplayer:"ownerDeletePlayer",ownerdeleteplayercompletely:"ownerDeletePlayer",deleteplayercompletely:"ownerDeletePlayer",
+    joingame:"joinGame",saveprogress:"saveProgress",submitscore:"submitScore",leaderboard:"leaderboard",exportleaderboard:"exportLeaderboard",
+    renameplayertypo:"renamePlayerTypo",fairplayaudit:"fairPlayAudit",owneradjust:"ownerAdjust",generatetempadmincode:"generateTempAdminCode",
+    getactionlogs:"getActionLogs",getsuspiciousactivity:"getSuspiciousActivity",internalsummaryreport:"internalSummaryReport",
+    participationreport:"participationReport",redemptionreport:"redemptionReport",prizepointsreport:"prizePointsReport",
+    getactiveproviderround:"getActiveProviderRound",submitfunscore:"submitFunScore",funleaderboard:"funLeaderboard",deletefunuser:"deleteFunUser",
+    deepauditreport:"deepAuditReport",setupbonuspointssheet:"setupBonusPointsSheet",getcustomquestions:"getCustomQuestions",
+    savecustomquestions:"saveCustomQuestions",logpracticerun:"logPracticeRun",fullauditreport:"fullAuditReport",
+    bonuspointreport:"bonusPointReport",makeupeligibilityreport:"makeupEligibilityReport",activerounddashboard:"activeRoundDashboard"
+  };
+  return aliases[compact]||raw;
+}
+function doPost(e){try{
+  const data=JSON.parse(e.postData.contents||"{}");
+  const a=normalizeActionName(data.action);
+  data.action=a;
+  if(a==="backendVersion")return json({ok:true,version:BACKEND_VERSION});
+  if(a==="joinGame")return json(joinGame(data,e));
+  if(a==="saveProgress")return json(saveProgress(data,e));
+  if(a==="submitScore")return json(submitScore(data,e));
+  if(a==="leaderboard")return json(getLeaderboard());
+  if(a==="exportLeaderboard")return json(exportLeaderboard(data,e));
+  if(a==="adminVerify")return json({ok:isAdmin(data.code),version:BACKEND_VERSION});
+  if(a==="ownerVerify")return json({ok:isOwner(data.code),version:BACKEND_VERSION});
+  if(a==="setReleaseStatus")return json(setReleaseStatus(data,e));
+  if(a==="setWeekGame")return json(setWeekGame(data,e));
+  if(a==="renamePlayerTypo")return json(renamePlayerTypo(data,e));
+  if(a==="fairPlayAudit")return json(fairPlayAudit(data));
+  if(a==="ownerAdjust")return json(ownerAdjust(data,e));
+  if(a==="ownerResetPlayerRound")return json(ownerResetPlayerRound(data,e));
+  if(a==="ownerArchiveResetLeaderboard")return json(ownerArchiveResetLeaderboard(data,e));
+  if(a==="ownerDeletePlayer")return json(ownerDeletePlayer(data,e));
+  if(a==="generateTempAdminCode")return json(generateTempAdminCode(data,e));
+  if(a==="getActionLogs")return json(getActionLogs(data));
+  if(a==="getSuspiciousActivity")return json(getSuspiciousActivity(data));
+  if(a==="internalSummaryReport")return json(internalSummaryReport(data));
+  if(a==="participationReport")return json(participationReport(data));
+  if(a==="redemptionReport")return json(redemptionReport(data));
+  if(a==="prizePointsReport")return json(prizePointsReport(data));
+  if(a==="getActiveProviderRound")return json(getActiveProviderRound(data));
+  if(a==="submitFunScore")return json(submitFunScore(data,e));
+  if(a==="funLeaderboard")return json(funLeaderboard(data));
+  if(a==="deleteFunUser")return json(deleteFunUser(data,e));
+  if(a==="deepAuditReport")return json(deepAuditReport(data));
+  if(a==="setupBonusPointsSheet")return json(setupBonusPointsSheet(data,e));
+  if(a==="getCustomQuestions")return json(getCustomQuestions(data));
+  if(a==="saveCustomQuestions")return json(saveCustomQuestions(data,e));
+  if(a==="clearCustomQuestions")return json(clearCustomQuestions(data,e));
+  if(a==="logPracticeRun")return json(logPracticeRun(data,e));
+  if(a==="fullAuditReport")return json(fullAuditReport(data));
+  if(a==="bonusPointReport")return json(bonusPointReport(data));
+  if(a==="makeupEligibilityReport")return json(makeupEligibilityReport(data));
+  if(a==="activeRoundDashboard")return json(activeRoundDashboard(data));
+  if(a==="forceCloseAllRounds")return json(forceCloseAllRounds(data,e));
+  return json({ok:false,message:"Unknown action: "+String(data.action||"(blank)")+". The deployed Apps Script is outdated or does not match the website.",version:BACKEND_VERSION});
+}catch(err){return json({ok:false,message:String(err),version:BACKEND_VERSION});}}
 function json(o){return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);}
 function ss(){return SpreadsheetApp.getActiveSpreadsheet();}function sheet(n){return ss().getSheetByName(n);}function now(){return new Date();}function norm(n){return String(n||"").trim().replace(/\s+/g," ").toLowerCase();}function nice(n){return String(n||"").trim().replace(/\s+/g," ");}function uuid(){return Utilities.getUuid();}
 function isOwner(c){return String(c||"")===OWNER_CODE;}function isAdmin(c){return String(c||"")===ADMIN_CODE||isTempAdmin(c);}function canExport(c){return isAdmin(c)||isOwner(c);}function boolValue(v){return v===true||v==="TRUE"||v==="true";}
