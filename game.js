@@ -76,7 +76,7 @@ async function adminLogin(){
   if(status)status.textContent="Checking admin code...";
   try{
     const result=await api("adminVerify",{code:$("adminCode").value.trim()});
-    if(result.ok){$("adminPanel").classList.remove("hidden");if(status)status.textContent="Admin functions unlocked.";}
+    if(result.ok){$("adminPanel").classList.remove("hidden");if(status)status.textContent="Admin functions unlocked.";await verifyBackendVersion("adminOutput");}
     else{if(status)status.textContent=result.message||"Invalid admin code.";alert(result.message||"Invalid admin code.");}
   }catch(e){if(status)status.textContent="Connection error: "+e.message;alert("Admin login could not connect: "+e.message);}
 }
@@ -85,9 +85,20 @@ async function ownerLogin(){
   if(status)status.textContent="Checking owner code...";
   try{
     const result=await api("ownerVerify",{code:$("ownerCode").value.trim()});
-    if(result.ok){$("ownerPanel").classList.remove("hidden");if(status)status.textContent="Owner functions unlocked.";}
+    if(result.ok){$("ownerPanel").classList.remove("hidden");if(status)status.textContent="Owner functions unlocked.";await verifyBackendVersion("ownerOutput");}
     else{if(status)status.textContent=result.message||"Invalid owner code.";alert(result.message||"Invalid owner code.");}
   }catch(e){if(status)status.textContent="Connection error: "+e.message;alert("Owner login could not connect: "+e.message);}
+}
+async function verifyBackendVersion(outputId){
+  const result=await api("backendVersion",{});
+  const output=$(outputId);
+  if(!result.ok||result.version!=="30.4"){
+    const msg="Website and Apps Script do not match. Deploy Apps Script v30.4 as a NEW VERSION, then refresh this page.";
+    if(output)output.textContent=msg+" Current backend response: "+JSON.stringify(result);
+    alert(msg);
+    return false;
+  }
+  return true;
 }
 async function runPortalAction(role, actionName, payload){
   const output=$(role==="owner"?"ownerOutput":"adminOutput");
@@ -125,7 +136,7 @@ async function setupBonusPointsSheet(role){const code=role==="owner"?$("ownerCod
 async function renamePlayer(role){const code=role==="owner"?$("ownerCode").value:$("adminCode").value;const oldName=role==="owner"?$("ownerOldName").value:$("adminOldName").value;const newName=role==="owner"?$("ownerNewName").value:$("adminNewName").value;const result=await api("renamePlayerTypo",{role,code,oldName,newName});$(role==="owner"?"ownerOutput":"adminOutput").textContent=JSON.stringify(result,null,2);await refreshLeaderboard();}
 async function ownerResetPlayerRound(){const result=await api("ownerResetPlayerRound",{code:$("ownerCode").value,name:$("resetPlayerName").value,week:$("resetWeek").value,releaseType:$("resetReleaseType").value});$("ownerOutput").textContent=JSON.stringify(result,null,2);await refreshLeaderboard();}
 async function ownerArchiveResetLeaderboard(){if(!confirm("Archive all current leaderboard points and reset the visible leaderboard? Completed plays, adjustments, and bonus points will be saved to the Leaderboard Archive sheet."))return;const result=await runPortalAction("owner","ownerArchiveResetLeaderboard",{code:$("ownerCode").value.trim()});if(result.ok){await refreshLeaderboard();alert("Leaderboard archived and reset successfully.");}}
-async function ownerDeletePlayer(){const name=$("ownerDeletePlayerName").value;if(!name)return alert("Enter a player name to delete.");if(!confirm("Completely delete all records for "+name+"? This cannot be undone."))return;const result=await api("ownerDeletePlayer",{code:$("ownerCode").value,name});$("ownerOutput").textContent=JSON.stringify(result,null,2);await refreshLeaderboard();}
+async function ownerDeletePlayer(){const name=$("ownerDeletePlayerName").value.trim();if(!name)return alert("Enter a player name to delete.");if(!confirm("Completely delete all records for "+name+"? This cannot be undone."))return;const result=await runPortalAction("owner","ownerDeletePlayerCompletely",{code:$("ownerCode").value.trim(),name});if(result.ok)await refreshLeaderboard();}
 
 
 
