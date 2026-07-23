@@ -2,20 +2,20 @@ const ADMIN_CODE="MHI-ADMIN-FRIDAY-2026";
 const OWNER_CODE="MHI-OWNER-MARIO-TV-2026";
 const TEMP_ADMIN_MINUTES=60;
 const SHEETS={SETTINGS:"Settings",PLAYERS:"Players",PLAYS:"Plays",ADJUSTMENTS:"Adjustments",ACTION_LOGS:"Action Logs",TEMP_CODES:"Temporary Admin Codes",SUSPICIOUS:"Suspicious Activity",FUN_SCORES:"Fun Scores",CORRECTIONS:"Name Corrections",BONUS_POINTS:"External Bonus Points",CUSTOM_QUESTIONS:"Custom Questions"};
-const BACKEND_VERSION="30.4";
+const BACKEND_VERSION="31.0";
 function normalizeActionName(value){
   const raw=String(value||"").trim();
   const compact=raw.toLowerCase().replace(/[^a-z0-9]/g,"");
   const aliases={
-    backendversion:"backendVersion",
-    adminverify:"adminVerify",ownerverify:"ownerVerify",
-    setreleasestatus:"setReleaseStatus",closeround:"setReleaseStatus",openround:"setReleaseStatus",
-    setweekgame:"setWeekGame",setgame:"setWeekGame",
-    clearcustomquestions:"clearCustomQuestions",resetcustomquestions:"clearCustomQuestions",
-    forcecloseallrounds:"forceCloseAllRounds",closeallrounds:"forceCloseAllRounds",
+    backendversion:"backendVersion",healthcheck:"backendVersion",ping:"backendVersion",
+    setreleasestatus:"setReleaseStatus",closeround:"setReleaseStatus",admincloseround:"setReleaseStatus",ownercloseround:"setReleaseStatus",openround:"setReleaseStatus",
+    clearcustomquestions:"clearCustomQuestions",clearquestions:"clearCustomQuestions",resetcustomquestions:"clearCustomQuestions",
+    forcecloseallrounds:"forceCloseAllRounds",closeallrounds:"forceCloseAllRounds",forceclose:"forceCloseAllRounds",
     ownerresetplayerround:"ownerResetPlayerRound",resetplayerround:"ownerResetPlayerRound",
-    ownerarchiveresetleaderboard:"ownerArchiveResetLeaderboard",archiveresetleaderboard:"ownerArchiveResetLeaderboard",resetleaderboard:"ownerArchiveResetLeaderboard",
-    ownerdeleteplayer:"ownerDeletePlayer",ownerdeleteplayercompletely:"ownerDeletePlayer",deleteplayercompletely:"ownerDeletePlayer",
+    ownerarchiveresetleaderboard:"ownerArchiveResetLeaderboard",archiveresetleaderboard:"ownerArchiveResetLeaderboard",archiveandresetleaderboard:"ownerArchiveResetLeaderboard",resetleaderboard:"ownerArchiveResetLeaderboard",
+    ownerdeleteplayer:"ownerDeletePlayer",ownerdeleteplayercompletely:"ownerDeletePlayer",deleteplayercompletely:"ownerDeletePlayer",deleteplayer:"ownerDeletePlayer",
+    adminverify:"adminVerify",ownerverify:"ownerVerify",
+    setweekgame:"setWeekGame",setgame:"setWeekGame",
     joingame:"joinGame",saveprogress:"saveProgress",submitscore:"submitScore",leaderboard:"leaderboard",exportleaderboard:"exportLeaderboard",
     renameplayertypo:"renamePlayerTypo",fairplayaudit:"fairPlayAudit",owneradjust:"ownerAdjust",generatetempadmincode:"generateTempAdminCode",
     getactionlogs:"getActionLogs",getsuspiciousactivity:"getSuspiciousActivity",internalsummaryreport:"internalSummaryReport",
